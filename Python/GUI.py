@@ -3,7 +3,6 @@
 
 import tkinter as Tk
 import tkinter.ttk as ttk
-from Model import Model
 from threading import Timer
 from pubsub import pub
 from array import array
@@ -11,7 +10,8 @@ from Frames.COM_Frame import *
 from Frames.Logger_Frame import *
 from Frames.Control_Frame import *
 from Frames.FileExplorer_Frame import *
-from DataLogger import *
+from API.DataLogger import *
+from API.Model import Model
 
 class Application(ttk.Frame):
         
