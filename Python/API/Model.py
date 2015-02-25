@@ -2,12 +2,13 @@
 # For conditions of distribution and use, see copyright notice in the LICENSE file
 
 from pubsub import pub
-from SerialPort import SerialPort
-from DistantIO import DistantIO
-from Protocol import Protocol
 from threading import Thread
-from VariableManager import VariableManager
-from DataLogger import DataLogger
+
+from API.SerialPort import SerialPort
+from API.DistantIO import DistantIO
+from API.Protocol import Protocol
+from API.VariableManager import VariableManager
+from API.DataLogger import DataLogger
 
 # Top-level API
 
