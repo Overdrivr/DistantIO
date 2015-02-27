@@ -109,6 +109,9 @@ class SerialPort(Thread):
         self.maxinwaiting = 0
         return tmp
 
+    def char_amount(self):
+        return self.rxqueue.qsize()
+
     def run(self):
         #Main serial loop      
         while self.running:

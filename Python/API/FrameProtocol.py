@@ -13,8 +13,8 @@ class ESC_STATE(Enum):
     IDLE = 0
     NEXT = 1
 
-#Robust serial protocol with bit stuffing
-class Protocol():
+#Robust serial protocol with bit stuffing to delimit frames
+class FrameProtocol():
 
     def __init__(self):
         self.rx_state = RX_STATE.IDLE;
@@ -84,7 +84,10 @@ class Protocol():
             return None
         else:
             return self.payloads.get()
-        
+
+    def amount(self):
+        return self.payloads.qsize()
+    
     def process_tx(self, rxpayload):
         frame = bytearray()
         frame.append(self.SOF)

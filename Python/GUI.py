@@ -11,7 +11,7 @@ from Frames.Logger_Frame import *
 from Frames.Control_Frame import *
 from Frames.FileExplorer_Frame import *
 from API.DataLogger import *
-from API.Model import Model
+from API.DistantIO import API
 
 class Application(ttk.Frame):
         
@@ -26,7 +26,7 @@ class Application(ttk.Frame):
         self.grid(row=0,column=0,sticky="WENS")
 
         # Create Model
-        self.model = Model()
+        self.model = API()
 
         # Init notebook holding the tabs
         self.tabs = ttk.Notebook(self)

@@ -1,276 +1,173 @@
 # Copyright (C) 2014 Rémi Bèges
 # For conditions of distribution and use, see copyright notice in the LICENSE file
 
-from queue import Queue
-import struct
 from pubsub import pub
-import time as tm
+from threading import Thread
 
-# DistantIO class : to read and write variables on the MCU from distant computer
+from API.SerialPort import SerialPort
+from API.DistantIOProtocol import DistantIOProtocol
+from API.FrameProtocol import FrameProtocol
+from API.VariableManager import VariableManager
+from API.DataLogger import DataLogger
+from time import *
 
-class DistantIO():
+# Top-level API
 
-    def __init__(self):
-        """
-        Dictionnary holding the variable table
-        """
-        # [variable_id]['datatype']   : data type (float, int32, uint8, etc.)
-        # [variable_id]['octets']     : data size in octets
-        # [variable_id]['is_array']   : True or False
-        # [variable_id']['amount']    : 1 if scalar, array size if array
-        # [variable_id]['writeable']  : if the variable can be written
-        # [variable_id]['name']       : variable name
-        self.variables = dict()
-
-        # For converting dataid to a type
-        self.type_lookup = {0 : '=f',
-                            1 : '=B',
-                            2 : '=H',
-                            3 : '=I',
-                            4 : '=b',
-                            5 : '=h',
-                            6 : '=i'
-                            }
-        self.size_lookup = {0 : 4,
-                            1 : 1,
-                            2 : 2,
-                            3 : 4,
-                            4 : 1,
-                            5 : 2,
-                            6 : 4}
-        self.start_time = tm.time()
-
-    #Process RX bytes queue
-    def decode(self,rxpayload):
-        frame = rxpayload
-        index = 0
-
-        if len(frame) < 1:
-            print("DistantIO error : frame size not valid")
-            return None
-            
-        command = frame[0]
-
-        # Alive signal
-        if command == 85:
-            self.start_time = tm.time()
-        # Parse 'received_variable_value' payload 
-        elif command == 0:
-            if len(frame) < 7:
-                print("DistantIO error : frame size not valid")
-                return None
-            
-            # Get dataid 
-            temp = bytearray(0)
-            temp.append(frame[1])
-            temp.append(frame[2])
-            temp.append(0)
-            temp.append(0)
+class API(Thread):
+    def __init__(self, **kwargs):
+        Thread.__init__(self)
+        # Serial thread
+        self.serialthread = SerialPort()
+        # Controller Read/Write variables over serial
+        self.controller = DistantIOProtocol()
+        # Serial protocol
+        self.protocol = FrameProtocol()
+        # Variable manager
+        self.variable_manager = VariableManager(self)
+        self.variable_manager.start()
+        self.running = True;
+        # Data logger
+        self.logger = DataLogger()
         
-            dataid = struct.unpack("=i",temp)[0]
+    def get_ports(self):
+        return self.serialthread.get_ports()
 
-            # Get timepoint
-            temp = bytearray(0)
-            temp.append(frame[3])
-            temp.append(frame[4])
-            temp.append(frame[5])
-            temp.append(frame[6])
+    # To check if the connected MCU is returning the alive signal properly 
+    def is_alive(self,delay_s):
+        return self.controller.is_alive(delay_s)
         
-            time = struct.unpack("=I",temp)[0]
-
-            # Check data ID exists
-            if not dataid in self.variables:
-                return None
-            new_values = list()
-            index = 7
-
-            # Decode data
-            if (len(frame) - index) < self.size_lookup[self.variables[dataid]['datatype']]:
-                print("DistantIO error : Unvalid frame size.")
-                return
-                
-            while len(frame) - index >= self.size_lookup[self.variables[dataid]['datatype']]:
-                # Stock raw bytes in byte array
-                temp = bytearray()
-                for i in range(self.size_lookup[self.variables[dataid]['datatype']]):
-                    temp.append(frame[index])
-                    index += 1
-
-                # Get format
-                fmt = self.type_lookup[self.variables[dataid]['datatype']]
-                    
-                # Transform value to desired format
-                val = struct.unpack(fmt,temp)[0]
-                    
-                # Store to list
-                new_values.append(val)
-
-                # Combine with timepoint
-                data_dict = dict()
-                data_dict['time'] = time
-                data_dict['values'] = new_values
-                
-            #Publish the value update
-            try :
-                pub.sendMessage('var_value_update',varid=dataid,data=data_dict)
-            except:
-                print("DistantIO Error : Dead listener :")
-        # Parse 'received_table' payload
-        elif command == 2:            
-            #Empty list
-            self.variables = dict()
+    def connect_com(self,COM_port):
+        # Start serial thread (can run without COM port connected)
+        if not self.serialthread.isAlive():
+            self.serialthread.start()
             
-            index = 1
+        self.serialthread.connect(COM_port,115200)
+
+    #Model update running in a thread
+    def run(self):
+        while self.running:
+            if self.serialthread.char_available():
+                c = self.serialthread.get_char()
+                if not c is None:
+                    self.protocol.process_rx(c)
+
+            if self.protocol.available():
+                p =  self.protocol.get()
+                # Dump payload if controller is in heavy load ?
+                pub.sendMessage('new_rx_payload',rxpayload=p)#USED ?
+                if not p is None:
+                    self.controller.decode(p)
+
+    def disconnect_com(self):
+        self.serialthread.disconnect()
+         
+    def stop(self):
+        self.running = False
+        self.serialthread.stop()
+        self.variable_manager.stop()
+
+        if self.serialthread.isAlive():
+            self.serialthread.join(0.1)
             
-            while len(frame) - index >= 37:
-                # Read datatype
-                databyte = frame[index]
-                datatype = databyte & 0x0F
-                index+=1
-                
-                # Read rights
-                writeable = (databyte >> 4) == 0x0F
-                
-                # Read variable ID
-                temp = bytearray()
-                temp.append(frame[index])
-                temp.append(frame[index+1])
-                index += 2
-                
-                varid = struct.unpack('H',temp)[0]
+        if self.serialthread.isAlive():
+            self.serialthread.join(1)
 
-                # Read variable size in octets
-                temp = bytearray()
-                temp.append(frame[index])
-                temp.append(frame[index+1])
-                index += 2
-                
-                octets = struct.unpack('H',temp)[0]
+        if self.serialthread.isAlive():
+            print("--- Serial thread not properly joined.")
 
-                # Compute array size if array
-                if octets == self.size_lookup[datatype]:
-                    is_array = True
-                    array_size = 1
-                else:
-                    is_array = False
-                    array_size = octets / self.size_lookup[datatype]
-                    if not (octets % self.size_lookup[datatype]) == 0:
-                        print("DistantIO error : Stride not correct, computed array size is wrong.")
-                    
-                
-                # Read name
-                name = ""
-                
-                #32 characters max
-                for x in range(0,32):
-                    c = str(chr(frame[index]))
-                    name += c
-                    index += 1
-
-                # Stock everything in dictionnary
-                self.variables[varid] = dict()
-                
-                self.variables[varid]['datatype'] = datatype
-                self.variables[varid]['octets'] = octets
-                self.variables[varid]['is_array'] = is_array
-                self.variables[varid]['amount'] = array_size
-                self.variables[varid]['writeable'] = writeable
-                self.variables[varid]['name'] = name
-                
-            #If successful, publish new table
-            pub.sendMessage('logtable_update',varlist=self.variables)
-        else:
-            print("DistantIO error : unknown MCU answer : ",frame)
-
+        if self.variable_manager.isAlive():
+            self.variable_manager.join(0.1)
+            
+        if self.variable_manager.isAlive():
+            self.variable_manager.join(1)
+            
+        self.stop_controller()
+        
+    def start_controller(self):
+        #Get command for querying variable table MCU side
+        cmd = self.controller.encode(cmd='table')
+        #Feed command to serial protocol payload processor
+        frame = self.protocol.process_tx(cmd)        
+        #Send command
+        self.serialthread.write(frame)      
+        
+    def stop_controller(self):
+        #TODO : Tell MCU to stop sending all data
         pass
 
-    #Command for asking the MCU the loggable variables 
-    def encode(self, cmd, var_id=0 ,value=0): 
-        frame = bytearray()
+    def start_log(self):
+        self.logger.start()
+        #subscribe
+        
+    def stop_log(self):
+        self.logger.record_all()
+        #unsubscribe
+        
+    def read_var(self, varid):        
+        # Get command
+        cmd = self.controller.encode(cmd='read',var_id=varid)
+        # Feed command to serial protocol payload processor
+        frame = self.protocol.process_tx(cmd)
+        # Send command
+        self.serialthread.write(frame)
+
+    def write_var(self,varid,value):
+        # Get command
+        cmd = self.controller.encode(cmd='write',var_id=varid,value=value)
+        if cmd == None:
+            return
+        # Feed command to serial protocol payload processor
+        frame = self.protocol.process_tx(cmd)
+        # Send command
+        self.serialthread.write(frame)
+        
+    def stop_read_var(self,varid):
+        # Get command
+        cmd = self.controller.encode(cmd='stop',var_id=varid)
+        if cmd == None:
+            return
+        # Feed command to serial protocol payload processor
+        frame = self.protocol.process_tx(cmd)
+        # Send command
+        self.serialthread.write(frame)
+        
+    def stop_read_all_vars():
+        # Get command
+        cmd = self.controller.encode(cmd='stopall')
+        if cmd == None:
+            return
+        # Feed command to serial protocol payload processor
+        frame = self.protocol.process_tx(cmd)
+        # Send command
+        self.serialthread.write(frame)
+        
+    def get_var_info(self,varid):
+        return self.controller.get_var_info(varid)
+        
     
-        if cmd == 'table':
-            frame.append(int('02',16))
-            
-        elif cmd == 'read':        
-            frame.append(int('00',16))
-            packed = bytes(struct.pack('=H',var_id))
-            frame.extend(packed)
-            
-        elif cmd == 'write':
-            # Check data ID exists 
-            if not var_id in self.variables:
-                print("DistantIO error : Data ID ",var_id," not found.")
-                return None
+# List of events that can be subscribed to
+"""
+--- Serial port (SerialPort.py)
+    * When COM port is connected : 'com_port_connected',port
+    * When COM port is disconnected : 'com_port_disconnected'
+    
+--- Protocol (Protocol.py)
+    * deprecated ?* When a new payload has been decoded by the serial protocol : 'new_rx_payload',rxpayload
+    * When a character is not part of a message on the serial port : 'new_ignored_rx_byte',rxbyte
 
-            # Check rights
-            if not self.variables[var_id]['writeable']:
-                print("DistantIO error :  Variable not writeable.")
-                return None
+--- DistanIO (DistantIO.py)
+    * When variable table has been received : 'logtable_update',varlist
+    * When variable value has been received : 'var_value_update',varid,data
+    data is a dict
+    data['time'] : time value in us where variable was read
+    data['values'] : list of values (of size 1 if variable is a scalar)
 
-            # Find type
-            fmt = self.variables[var_id]['datatype']
-        
-            frame.append(int('01'))
+--- Plot2D_Frame (Plot2D_Frame.py)]
+--- Logger_Frame (Plot2D_Frame.py)
+    * When a graph or the logger frame has started using a variable : 'using_var',varid
+    * When a graph or the logger frame has stopped using a variable : 'stop_using_var',varid
 
-            packed = bytes(struct.pack('=H',var_id))
-            frame.extend(packed)
-        
-            # Parse double to type
-            val = None
-            if fmt == 0:
-                val = float(value)
-                packed = bytes(struct.pack('=f',val))
-            elif fmt == 1:
-                val = int(value)
-                packed = bytes(struct.pack('=B',val))
-            elif fmt == 2:
-                val = int(value)
-                packed = bytes(struct.pack('=H', val))
-            elif fmt == 3:
-                val = int(value)
-                packed = bytes(struct.pack('=I',val))
-            elif fmt == 4:
-                val = int(value)
-                try:
-                    packed = bytes(struct.pack('=b',val))
-                except:
-                    print("byte out of range")
-                    return None
-            elif fmt == 5:
-                val = int(value)
-                try:
-                    packed = bytes(struct.pack('=h',val))
-                except:
-                    print("int16 out of range")
-                    return None
-            elif fmt == 6:
-                val = int(value)
-                packed = bytes(struct.pack('=i',val))              
-            else:
-                print("Write format ",fmt," not supported.")
-                return None
-            
-            frame.extend(packed)
-        elif cmd == 'stop':
-            # Check data ID exists 
-            if not var_id in self.variables:
-                print("DistantIO error : Data ID ",var_id," not found.")
-                return None
-       
-            frame.append(int('03'))
-
-            packed = bytes(struct.pack('=H',var_id))
-            frame.extend(packed)
-            
-        elif cmd == 'stopall':       
-            frame.append(int('04'))
-        else:
-            return None
-        
-        return frame
-
-    def get_variable_table(self):
-        return self.variables
-
-    def is_alive(self, delay_s):
-        return not (tm.time() - self.start_time) > delay_s 
+--- GUI
+    *DEPRECATED When the selection of a variable to do something with (read, write) changes:
+    'new_var_selected',varid,varname
+"""
