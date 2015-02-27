@@ -29,7 +29,7 @@ class Logger_Frame(ttk.LabelFrame):
         self.txt_log = Tk.Label(self,text="STATUS :")
         self.txt_log.grid(column=0,row=0,sticky='ENW',pady=3,padx=3)
 
-        self.txt_active = Tk.Label(self,text="INACTIVE",fg='blue',borderwidth=2)
+        self.txt_active = Tk.Label(self,text="Disconnected",fg='blue',borderwidth=2)
         self.txt_active.grid(column=1,row=0,sticky='ENW',pady=3,padx=3)
 
         self.bouton_activate = ttk.Button(self, text="RETRIEVE TABLE", command = self.activate_log)
@@ -154,11 +154,11 @@ class Logger_Frame(ttk.LabelFrame):
             
     def change_state(self,state):
         if state == "inprocess":
-            self.txt_active.config(text="WAITING TABLE",fg="orange")
+            self.txt_active.config(text="Waiting table",fg="orange")
         elif state == "active":
-            self.txt_active.config(text="ACTIVE",fg='green')
+            self.txt_active.config(text="Alive",fg='green')
         else:
-            self.txt_active.config(text="INACTIVE",fg='blue')
+            self.txt_active.config(text="Disconnected",fg='blue')
         self.parent.update_idletasks()
 
     def write_value(self):
