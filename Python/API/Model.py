@@ -30,6 +30,10 @@ class Model(Thread):
         
     def get_ports(self):
         return self.serialthread.get_ports()
+
+    # To check if the connected MCU is returning the alive signal properly 
+    def is_alive(self,delay_s):
+        return self.controller.is_alive(delay_s)
         
     def connect_com(self,COM_port):
         # Start serial thread (can run without COM port connected)

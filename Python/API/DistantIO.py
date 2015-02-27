@@ -4,6 +4,7 @@
 from queue import Queue
 import struct
 from pubsub import pub
+import time as tm
 
 # DistantIO class : to read and write variables on the MCU from distant computer
 
@@ -37,6 +38,7 @@ class DistantIO():
                             4 : 1,
                             5 : 2,
                             6 : 4}
+        self.start_time = tm.time()
 
     #Process RX bytes queue
     def decode(self,rxpayload):
@@ -48,9 +50,12 @@ class DistantIO():
             return None
             
         command = frame[0]
-        
-        # Parse 'received_variable_value' payload
-        if command == 0:
+
+        # Alive signal
+        if command == 85:
+            self.start_time = tm.time()
+        # Parse 'received_variable_value' payload 
+        elif command == 0:
             if len(frame) < 7:
                 print("DistantIO error : frame size not valid")
                 return None
@@ -76,7 +81,6 @@ class DistantIO():
             # Check data ID exists
             if not dataid in self.variables:
                 return None
-            
             new_values = list()
             index = 7
 
@@ -268,3 +272,5 @@ class DistantIO():
     def get_variable_table(self):
         return self.variables
 
+    def is_alive(self, delay_s):
+        return not (tm.time() - self.start_time) > delay_s 
