@@ -29,6 +29,7 @@ class DataLogger():
         self.limit = 3000
         pub.subscribe(self.new_data,'var_value_update')
         pub.subscribe(self.new_data_table,'logtable_update')
+        pub.subscribe(self.record_serial,'new_ignored_rx_byte')
 
     def queue_size(self,queuesize):
         self.records = dict()
@@ -78,3 +79,6 @@ class DataLogger():
 
         archive.close()
         print("Recording done.")
+
+    def record_serial(self,rxbyte):
+        print(rxbyte.decode("utf-8"),end='')

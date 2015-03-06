@@ -108,9 +108,6 @@ def test_new_log_value():
         x += 0.05
         pub.sendMessage('var_value_update',varid=0,value=test)
 
-def printout_char(rxbyte):
-    print(rxbyte)
-
 """
 Program startup
 """
@@ -118,8 +115,6 @@ if __name__ == '__main__':
     # Create window
     root = Tk.Tk()    
     root.geometry('+0+0')
-
-    pub.subscribe(printout_char,'new_ignored_rx_byte')
     
     app = Application(root,width=640, height=480)
     app.grid()

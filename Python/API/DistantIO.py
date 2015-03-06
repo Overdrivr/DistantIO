@@ -143,7 +143,6 @@ class API(Thread):
         
     def get_var_info(self,varid):
         return self.controller.get_var_info(varid)
-        
     
 # List of events that can be subscribed to
 """
