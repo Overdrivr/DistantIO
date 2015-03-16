@@ -85,7 +85,12 @@ class SerialPort(Thread):
 
     def write(self, frame):
         if self.ser.isOpen() and self.running:
-            return self.ser.write(frame)
+            write_return = None
+            try:
+                write_rtrn = self.ser.write(frame)
+            except:
+                print("Serial port : Impossible to write value.")
+                return None
 
     def disconnect(self):
         if self.ser.isOpen():
