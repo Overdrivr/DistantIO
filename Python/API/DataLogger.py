@@ -81,4 +81,7 @@ class DataLogger():
         print("Recording done.")
 
     def record_serial(self,rxbyte):
-        print(rxbyte.decode("utf-8"),end='')
+        try:
+            print(rxbyte.decode("utf-8"),end='')
+        except:
+            pass
