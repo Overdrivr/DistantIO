@@ -2,7 +2,6 @@
 # For conditions of distribution and use, see copyright notice in the LICENSE file
 
 from enum import Enum
-from pubsub import pub
 from queue import Queue
 
 class RX_STATE(Enum):
@@ -14,9 +13,8 @@ class ESC_STATE(Enum):
     NEXT = 1
 
 #Robust serial protocol with bit stuffing to delimit frames
-class FrameProtocol():
-
-    def __init__(self):
+class Protocol():
+    def __init__(self,on_frame_decoded_callback):
         self.rx_state = RX_STATE.IDLE;
         self.escape_state = ESC_STATE.IDLE;
         self.SOF = int('f7',16)
@@ -24,12 +22,14 @@ class FrameProtocol():
         self.ESC = int('7d',16)
         self.payload = bytearray()
         # Max amount of payloads
-        self.payloads = Queue(10000)#TODO : CHECK BEHAVIOR
         self.framesize = 0;
         self.processed_octets = 0
+        # new frame callback
+        self.on_frame_decoded_callback = on_frame_decoded_callback
 
-    def process_rx(self, rxbyte):
-        newbyte = int.from_bytes(rxbyte,byteorder='big')
+    def decode(self, rxbyte):
+        #newbyte = int.from_bytes(rxbyte,byteorder='big')
+        newbyte = rxbyte
         self.processed_octets += 1
         
         #No frame in process
@@ -40,7 +40,7 @@ class FrameProtocol():
                 self.framesize = 0;
             else:
                 t = newbyte,
-                pub.sendMessage('new_ignored_rx_byte',rxbyte=bytes(t))
+                #pub.sendMessage('new_ignored_rx_byte',rxbyte=bytes(t))
                 
         #Frame is in process        
         else:
@@ -56,14 +56,14 @@ class FrameProtocol():
             elif self.escape_state == ESC_STATE.IDLE:
                 #End of frame, the payload is immediatly send to callback function
                 if newbyte == self.EOF:
-                    #pub.sendMessage("new_rx_payload",rxpayload=self.payload)
-                    self.payloads.put(self.payload)
+                    # Send frame to callback function
+                    self.on_frame_decoded_callback(self.payload)
                     self.payload = bytearray()
                     self.rx_state = RX_STATE.IDLE
                     
                 #Receive a SOF while a frame is running, error
                 elif newbyte == self.SOF:
-                    print("Protocol : Received frame unvalid, discarding.", self.payload)
+                    #print("Protocol : Received frame unvalid, discarding.", self.payload)
                     self.payload = bytearray()
                     self.rx_state = RX_STATE.IDLE
                                         
@@ -75,20 +75,8 @@ class FrameProtocol():
                 else:
                     self.payload.append(newbyte)
                     self.framesize += 1;
-
-    def available(self):
-        return not self.payloads.empty()
-
-    def get(self):
-        if self.payloads.empty():
-            return None
-        else:
-            return self.payloads.get()
-
-    def amount(self):
-        return self.payloads.qsize()
     
-    def process_tx(self, rxpayload):
+    def encode(self, rxpayload):
         frame = bytearray()
         frame.append(self.SOF)
         

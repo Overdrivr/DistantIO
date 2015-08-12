@@ -5,11 +5,9 @@ from threading import Thread
 import serial
 from queue import Queue
 from serial.tools.list_ports import comports
-from pubsub import pub
 
 #Serial data processing class
 class SerialPort(Thread):
-
     def __init__(self):
         Thread.__init__(self)
         self.ser = serial.Serial()
@@ -66,13 +64,13 @@ class SerialPort(Thread):
             self.ser.open()
         except:
             print("Serial port : Port ",port," found but impossible to open. Try to physically disconnect.")
-            pub.sendMessage('com_port_disconnected')
+            #pub.sendMessage('com_port_disconnected')
             self.ser.close()
             return False
 
         if self.ser.isOpen():
             print('Connected to port ',self.ser.port)
-            pub.sendMessage('com_port_connected',port=self.ser.port)
+            #pub.sendMessage('com_port_connected',port=self.ser.port)
             return True
 
         print("Unknow serial connection error, aborting")
