@@ -28,8 +28,8 @@ class Protocol():
         self.on_frame_decoded_callback = on_frame_decoded_callback
 
     def decode(self, rxbyte):
-        #newbyte = int.from_bytes(rxbyte,byteorder='big')
-        newbyte = rxbyte
+        newbyte = int.from_bytes(rxbyte,byteorder='big')
+        #newbyte = rxbyte
         self.processed_octets += 1
         
         #No frame in process
