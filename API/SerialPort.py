@@ -8,16 +8,14 @@ from serial.tools.list_ports import comports
 
 #Serial data processing class
 class SerialPort(Thread):
-    def __init__(self):
+    def __init__(self,on_rx_data_callback):
         Thread.__init__(self)
         self.ser = serial.Serial()
         self.ser.timeout = 1
         self.force = False
         self.default_to = False
-        self.rxqueue = Queue(0)
         self.running = True;
-        self.processed_octets = 0
-        self.maxinwaiting = 0
+        self.rx_data_callback = on_rx_data_callback
 
     def connect(self,port,baudrate,force=False,default_to=False):
         self.ser.baudrate = baudrate
@@ -83,37 +81,12 @@ class SerialPort(Thread):
 
     def write(self, frame):
         if self.ser.isOpen() and self.running:
-            write_return = None
-            try:
                 write_rtrn = self.ser.write(frame)
-            except:
-                print("Serial port : Impossible to write value.")
-                return None
 
     def disconnect(self):
         if self.ser.isOpen():
             self.ser.close()
             pub.sendMessage('com_port_disconnected')
-
-    def char_available(self):
-        return not self.rxqueue.empty()
-
-    def get_char(self):
-        if not self.rxqueue.empty():
-            return self.rxqueue.get()
-        else:
-            return None
-        
-    def get_processed_octets(self):
-        return self.processed_octets
-
-    def get_rxloadmax(self):
-        tmp = self.maxinwaiting
-        self.maxinwaiting = 0
-        return tmp
-
-    def char_amount(self):
-        return self.rxqueue.qsize()
 
     def run(self):
         #Main serial loop      
@@ -121,15 +94,14 @@ class SerialPort(Thread):
             if self.ser.isOpen():
                 try:
                     inwaiting = self.ser.inWaiting()
-                    self.maxinwaiting = max(self.maxinwaiting,inwaiting)
                     if inwaiting > 0:
                         serialout = self.ser.read(inwaiting)
                         mv = memoryview(serialout).cast('c')
-                        for item in mv:
-                            self.rxqueue.put(item,True)
-                            self.processed_octets += 1
+                        for c in mv:
+                            self.rx_data_callback(c)
                 except:
-                    pass
+                    raise RuntimeError("Issue during serial main loop")
+                    
         print("Serial thread stopped.")
         
         
