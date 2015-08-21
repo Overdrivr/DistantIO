@@ -8,76 +8,48 @@ from serial.tools.list_ports import comports
 
 #Serial data processing class
 class SerialPort(Thread):
-    def __init__(self,on_rx_data_callback):
+    def __init__(self,on_rx_data_callback,connection_attempt_callback):
         Thread.__init__(self)
         self.ser = serial.Serial()
-        self.ser.timeout = 1
-        self.force = False
-        self.default_to = False
-        self.running = True;
-        self.rx_data_callback = on_rx_data_callback
 
-    def connect(self,port,baudrate,force=False,default_to=False):
+        self.rx_data_callback = on_rx_data_callback
+        self.connection_attempt_callback = connection_attempt_callback
+        # Starting thread
+        self.running = True
+        self.attempt_connect = False
+        self.start()
+
+    def connect(self,port,baudrate):
         self.ser.baudrate = baudrate
         self.ser.port = port
-        self.force =force
-        self.default_to = force
-        
+
         portlist = self.get_ports()
         port_found = -1
         port_amount = 0
         terminate = False
 
-        #List all COM ports      
+        #List all COM ports
         for p, desc, hwid in sorted(portlist):
             port_amount+=1
             if p == self.ser.port:
                 port_found = 1
-                
-        #In case no port is found 
+
+        #In case no port is found
         if port_amount == 0:
             print('No COM port found.')
-            print('   - can use \'force\' mode to try connect anyway.')
-            terminate = True
-            
-            if self.force:
-                  terminate = False
-                  
+            self.connection_attempt_callback("NO-PORT-FOUND")
+
         #In case ports are found but not chosen one
         if port_amount > 0 and port_found == -1:
-            print(port,' port not found.')
-            print('   - can use \'default\' mode to default to fall back to a valid port.')
-            terminate = True
-            
-            if self.default_to:
-                terminate = False
-                ser.port = [x[1] for x in portlist][0]
-                
-        #Exit prematurely if error
-        if terminate:
-            print(port, 'port non valid, aborting.')
-            return False
-        
-        try:
-            self.ser.open()
-        except:
-            print("Serial port : Port ",port," found but impossible to open. Try to physically disconnect.")
-            #pub.sendMessage('com_port_disconnected')
-            self.ser.close()
-            return False
+            print(port,' port not found but others are available.')
+            self.connection_attempt_callback("OTHER-PORTS-FOUND")
 
-        if self.ser.isOpen():
-            print('Connected to port ',self.ser.port)
-            #pub.sendMessage('com_port_connected',port=self.ser.port)
-            return True
+        # If everything ok, start the connection in the thread
+        self.attempt_connect = True
 
-        print("Unknow serial connection error, aborting")
-        
+
     def get_ports(self):
         return serial.tools.list_ports.comports()
-        
-    def stop(self):
-        self.running = False;
 
     def write(self, frame):
         if self.ser.isOpen() and self.running:
@@ -86,10 +58,12 @@ class SerialPort(Thread):
     def disconnect(self):
         if self.ser.isOpen():
             self.ser.close()
-            pub.sendMessage('com_port_disconnected')
+
+    def stop(self):
+        self.running = False
 
     def run(self):
-        #Main serial loop      
+        #Main serial loop
         while self.running:
             if self.ser.isOpen():
                 try:
@@ -100,8 +74,21 @@ class SerialPort(Thread):
                         for c in mv:
                             self.rx_data_callback(c)
                 except:
-                    raise RuntimeError("Issue during serial main loop")
-                    
+                    self.connection_attempt_callback("DISCONNECTED")
+            elif self.attempt_connect:
+                self.attempt_connect = False
+                try:
+                    self.ser.open()
+                except:
+                    print("Serial port : Port ",self.ser.port," found but impossible to open. Try to physically disconnect.")
+                    self.ser.close()
+                    self.connection_attempt_callback("CONNECTION-ISSUE")
+
+                if self.ser.isOpen():
+                    print('Connected to port ',self.ser.port)
+                    self.connection_attempt_callback(self.ser.port)
+                else:
+                    self.connection_attempt_callback("UNKNOWN-CONNECTION-ISSUE")
+
+
         print("Serial thread stopped.")
-        
-        
