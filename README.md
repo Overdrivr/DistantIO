@@ -25,8 +25,8 @@ Both protocols are implemented in MCU/DistantIO/
 #### Computer side
 A python API implementing both protocols to communicate with the MCU is provided. 
 A GUI build with Tkinter is also supplied for communicating and debugging the MCU in a more friendly manner.
-![gui main control screenshot](https://raw.githubusercontent.com/Overdrivr/Freescale_Cup/master/gui_main_control.png)
-![gui plot screenshot](https://raw.githubusercontent.com/Overdrivr/Freescale_Cup/master/gui_plot.png)
+![gui main control screenshot](https://raw.githubusercontent.com/Overdrivr/DistantIO/master/gui_main_control.png)
+![gui plot screenshot](https://raw.githubusercontent.com/Overdrivr/DistantIO/master/gui_plot.png)
 
 ## Supported Hardware
 ### "Freedom" board
