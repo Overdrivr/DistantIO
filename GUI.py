@@ -42,6 +42,11 @@ if __name__ == '__main__':
 
     app = Application(root,width=640, height=480)
 
+    def onExit():
+        app.stop()
+        root.destroy()
+
+    root.wm_protocol ("WM_DELETE_WINDOW", onExit)
+
     app.mainloop()
-    app.stop()
     print("Done.")
