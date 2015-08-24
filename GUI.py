@@ -7,6 +7,7 @@ import tkinter.ttk as ttk
 from API.Model import Model
 
 from Frames.COM_Frame import COM_Frame
+from Frames.VariableTable_Frame import VariableTable_Frame
 
 class Application(ttk.Frame):
     def __init__(self,parent,**kwargs):
@@ -26,6 +27,10 @@ class Application(ttk.Frame):
         # Init tabs
         self.com_ports = COM_Frame(self,self.model,relief=Tk.GROOVE)
         self.com_ports.grid(column=0,row=0,sticky='NSEW',pady=2,padx=5)
+
+        # Init tabs
+        self.var_table = VariableTable_Frame(self,self.model,relief=Tk.GROOVE)
+        self.var_table.grid(column=0,row=1,sticky='NSEW',pady=2,padx=5)
 
     def stop(self):
         self.model.finish()
