@@ -8,18 +8,18 @@ from signalslot import Signal
 
 class Model():
     def __init__(self):
-        self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
-        self.protocol = Protocol(self.on_frame_decoded_callback)
-        self.distantio = DistantIO(self.on_tx_frame_callback)
-
         # Signals
         self.signal_connected = Signal(args=['port'])
         self.signal_disconnected = Signal()
         self.signal_connecting = Signal()
 
+        self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
+        self.protocol = Protocol(self.on_frame_decoded_callback)
+        self.distantio = DistantIO(self.on_tx_frame_callback)
+
     def connect(self,port,baudrate=115200):
         self.signal_connecting.emit()
-        rtrn = self.serial.connect(port,baudrate)
+        self.serial.connect(port,baudrate)
 
     def disconnect(self):
         self.serial.disconnect()
@@ -27,8 +27,7 @@ class Model():
     def finish(self):
         self.serial.disconnect()
         self.serial.stop()
-        while(self.serial.isAlive()):
-            print("Waiting for thread")
+        self.serial.join()
 
     def get_ports(self):
         return self.serial.get_ports()

@@ -14,6 +14,8 @@ class SerialPort(Thread):
 
         self.rx_data_callback = on_rx_data_callback
         self.connection_attempt_callback = connection_attempt_callback
+        self.connection_attempt_callback("DISCONNECTED")
+
         # Starting thread
         self.running = True
         self.attempt_connect = False
@@ -58,9 +60,11 @@ class SerialPort(Thread):
     def disconnect(self):
         if self.ser.isOpen():
             self.ser.close()
+        self.connection_attempt_callback("DISCONNECTED")
 
     def stop(self):
         self.running = False
+
 
     def run(self):
         #Main serial loop
@@ -74,11 +78,13 @@ class SerialPort(Thread):
                         for c in mv:
                             self.rx_data_callback(c)
                 except:
-                    self.connection_attempt_callback("DISCONNECTED")
+                    pass
             elif self.attempt_connect:
                 self.attempt_connect = False
                 try:
+                    print("Connecting")
                     self.ser.open()
+                    self.connection_attempt_callback("CONNECTED")
                 except:
                     print("Serial port : Port ",self.ser.port," found but impossible to open. Try to physically disconnect.")
                     self.ser.close()
@@ -89,6 +95,5 @@ class SerialPort(Thread):
                     self.connection_attempt_callback(self.ser.port)
                 else:
                     self.connection_attempt_callback("UNKNOWN-CONNECTION-ISSUE")
-
 
         print("Serial thread stopped.")
