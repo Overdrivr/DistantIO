@@ -32,14 +32,26 @@ class Model():
     def get_ports(self):
         return self.serial.get_ports()
 
-    def write(self, variable_id, data):
+    ### Distant IO calls to MCU
+    # Ask the MCU to return all descriptors
+    def request_descriptors(self):
+        frame = self.distantio.get_descriptors_frame()
+        frame = self.protocol.encode(frame)
+        self.serial.write(frame)
+
+    # Ask the MCU to write a variable
+    def request_write(self, variable_id, data):
         frame = self.distantio.write(variable_id,data)
         frame = self.protocol.encode(frame)
         self.serial.write(frame)
 
+    def request_read(self):
+        pass
+
     ## Callbacks
         # RX : serial to protocol
     def on_rx_data_callback(self,char):
+        print(char)
         self.protocol.decode(char)
 
         # RX : protocol to distantio
