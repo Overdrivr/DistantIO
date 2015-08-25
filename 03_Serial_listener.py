@@ -10,12 +10,14 @@ class SerialMgr():
     def __init__(self):
             
         # Create serial port manager
-        self.serial = SerialPort(self.on_rx_data)
-        self.serial.connect("COM5",9600)
-        self.serial.start()
+        self.serial = SerialPort(self.on_rx_data,self.on_connect_try_callback)
+        self.serial.connect("COM7",9600)
 
     def on_rx_data(self,c):
-        print(c)        
+        print(c.decode('ascii'),end='')
+
+    def on_connect_try_callback(self,data):
+        print(data)
 
 if __name__ == '__main__':
     
