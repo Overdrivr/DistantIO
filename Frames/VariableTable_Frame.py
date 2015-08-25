@@ -89,15 +89,15 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.var_list.grid_columnconfigure(3, weight=1)
 
         # Subscriptions
-        pub.subscribe(self.listener_COM_connected,'com_port_connected')
-        pub.subscribe(self.listener_value_received,'var_value_update')
-        pub.subscribe(self.listener_table_received,'logtable_update')
+        #pub.subscribe(self.listener_COM_connected,'com_port_connected')
+        #pub.subscribe(self.listener_value_received,'var_value_update')
+        #pub.subscribe(self.listener_table_received,'logtable_update')
 
     def activate_log(self):
         # Activate serial data interception
         self.change_state("inprocess")
         # Start logger
-        self.model.start_controller()
+        self.model.request_descriptors()
 
     def listener_COM_connected(self,port):
         # We activate the distant IO controller immediately after the COM port was connected
@@ -210,14 +210,3 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.plot.protocol('WM_DELETE_WINDOW', self.plot_frame.stop)
         self.plot.minsize(width=300, height=200)
         self.plot_frame.add_var_to_plot()
-
-
-
-if __name__=="__main__":
-    root = Tk.Tk()
-    Log_frm = Logger_Frame(root,None)
-    root.minsize(width=350, height=400)
-    for val in range(0,20):
-        Log_frm.var_list.insert('','end', text="allo", values=val)
-    root.mainloop()
-    root.destroy()
