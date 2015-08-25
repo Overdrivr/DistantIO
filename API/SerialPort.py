@@ -58,8 +58,7 @@ class SerialPort(Thread):
                 write_rtrn = self.ser.write(frame)
 
     def disconnect(self):
-        if self.ser.isOpen():
-            self.ser.close()
+        self.ser.close()
         self.connection_attempt_callback("DISCONNECTED")
 
     def stop(self):
