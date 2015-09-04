@@ -50,12 +50,12 @@ class Model():
 
     ## Callbacks
         # RX : serial to protocol
-    def on_rx_data_callback(self,char):
-        print(char)
-        self.protocol.decode(char)
+    def on_rx_data_callback(self,c):
+        self.protocol.decode(c)
 
         # RX : protocol to distantio
     def on_frame_decoded_callback(self,frame):
+        print(str(frame))
         self.distantio.process(frame)
 
         # TX : distantio to serial
