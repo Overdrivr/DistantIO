@@ -59,9 +59,6 @@ class COM_Frame(ttk.LabelFrame):
         self.listbox_frame.grid_columnconfigure(0,weight=1)
         self.listbox_frame.grid_rowconfigure(0,weight=1)
 
-        # Immediatly ask list of available com ports
-        self.refresh_COM_ports()
-
         # Connect Signals from model to callbacks
         self.model.signal_connected.connect(self.com_connected)
         self.model.signal_disconnected.connect(self.com_disconnected)
