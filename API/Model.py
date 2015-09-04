@@ -5,6 +5,7 @@ from API.SerialPort import SerialPort
 from API.DistantIO import DistantIO
 from API.Protocol import Protocol
 from signalslot import Signal
+from threading import *
 
 class Model():
     def __init__(self):
@@ -12,17 +13,28 @@ class Model():
         self.signal_connected = Signal(args=['port'])
         self.signal_disconnected = Signal()
         self.signal_connecting = Signal()
+        self.signal_MCU_state_changed = Signal(args=['alive'])
 
         self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
         self.protocol = Protocol(self.on_frame_decoded_callback)
         self.distantio = DistantIO(self.on_tx_frame_callback)
 
+        self.mcu_died_delay = 2.0
+        self.mcu_alive_timer = None
+
+
     def connect(self,port,baudrate=115200):
         self.signal_connecting.emit()
         self.serial.connect(port,baudrate)
 
+        self.mcu_alive_timer = Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
+        self.mcu_alive_timer.start()
+
     def disconnect(self):
         self.serial.disconnect()
+
+        self.mcu_alive_timer.cancel()
+        self.mcu_alive_timer.join()
 
     def finish(self):
         self.serial.disconnect()
@@ -55,8 +67,28 @@ class Model():
 
         # RX : protocol to distantio
     def on_frame_decoded_callback(self,frame):
-        print(str(frame))
-        self.distantio.process(frame)
+        instruction = self.distantio.process(frame)
+
+        # If distantio processing requires no further action
+        if instruction is None:
+            return
+        if instruction['type'] is None:
+            return
+
+        # If distantio received a alive signal
+        if instruction['type'] == "alive-signal":
+            # Restart the timer
+            self.mcu_alive_timer.cancel()
+            self.mcu_alive_timer.join()
+
+            self.mcu_alive_timer = Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
+
+            self.mcu_alive_timer.start()
+            self.signal_MCU_state_changed.emit(alive=True)
+
+    def on_mcu_lost_connection(self):
+        print("Lost connection")
+        self.signal_MCU_state_changed.emit(alive=False)
 
         # TX : distantio to serial
     def on_tx_frame_callback(self,frame):

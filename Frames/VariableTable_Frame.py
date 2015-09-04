@@ -89,7 +89,7 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.var_list.grid_columnconfigure(3, weight=1)
 
         # Subscriptions
-        #pub.subscribe(self.listener_COM_connected,'com_port_connected')
+        self.model.signal_MCU_state_changed.connect(self.on_MCU_state_changed)
         #pub.subscribe(self.listener_value_received,'var_value_update')
         #pub.subscribe(self.listener_table_received,'logtable_update')
 
@@ -193,9 +193,6 @@ class VariableTable_Frame(ttk.LabelFrame):
         else:
             self.variable.set("** Variable not writeable **")
 
-
-        #pub.sendMessage("new_var_selected",varid=var_id,varname=self.variables[var_id]['name'])
-
         self.defined_first = False
 
 
@@ -210,3 +207,7 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.plot.protocol('WM_DELETE_WINDOW', self.plot_frame.stop)
         self.plot.minsize(width=300, height=200)
         self.plot_frame.add_var_to_plot()
+
+    # Callback functions
+    def on_MCU_state_changed(self,alive,**kwargs):
+        print("MCU state :"+str(alive))
