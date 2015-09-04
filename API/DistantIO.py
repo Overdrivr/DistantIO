@@ -27,4 +27,4 @@ class DistantIO():
         print(packet)
 
     def process(self,frame):
-        print("RX:"+frame)
+        print("RX:"+str(frame))
