@@ -3,11 +3,13 @@
 
 from API.Protocol import Protocol
 from API.crc import *
+from struct import *
 
 class DistantIO():
     def __init__(self,on_tx_frame_callback):
         self.variables = []
         self.on_tx_frame_callback = on_tx_frame_callback
+        self.payload_size = 14
 
     # Returns the get-descriptors frame
     def get_descriptors_frame(self):
@@ -27,4 +29,28 @@ class DistantIO():
         print(packet)
 
     def process(self,frame):
-        print("RX:"+str(frame))
+        returned_instruction = dict()
+        returned_instruction['type'] = None
+
+        # First, check data size
+        if len(frame) != self.payload_size:
+            return returned_instruction
+
+        # Second, check crc
+        crc_frame = unpack('H',frame[-2:])[0]
+        crc_ref = crc16(frame[:-2])
+
+        if crc_frame != crc_ref:
+            print("CRC don't match - aborting.")
+            print("Frame : "+str(frame))
+            print("Local crc : "+str(crc_ref))
+            print("Frame crc : "+str(crc_frame))
+            return returned_instruction
+
+        # Identify command
+        cmd = frame[0]
+
+        # Alive signal
+        if cmd == 0x03:
+            returned_instruction['type'] = 'alive-signal'
+            return returned_instruction
