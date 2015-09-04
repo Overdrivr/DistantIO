@@ -27,6 +27,7 @@ class Application(ttk.Frame):
         # Init tabs
         self.com_ports = COM_Frame(self,self.model,relief=Tk.GROOVE)
         self.com_ports.grid(column=0,row=0,sticky='NSEW',pady=2,padx=5)
+        self.com_ports.refresh_COM_ports()
 
         # Init tabs
         self.var_table = VariableTable_Frame(self,self.model,relief=Tk.GROOVE)
@@ -53,5 +54,5 @@ if __name__ == '__main__':
 
     root.wm_protocol ("WM_DELETE_WINDOW", onExit)
 
-    app.mainloop()
+    root.mainloop()
     print("Done.")

@@ -11,7 +11,7 @@ class SerialMgr():
             
         # Create serial port manager
         self.serial = SerialPort(self.on_rx_data,self.on_connect_try_callback)
-        self.serial.connect("COM7",9600)
+        self.serial.connect("COM11",115200)
 
     def on_rx_data(self,c):
         print(c.decode('ascii'),end='')
