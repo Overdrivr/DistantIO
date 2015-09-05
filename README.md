@@ -1,3 +1,5 @@
+[![Coverage Status](https://coveralls.io/repos/Overdrivr/DistantIO/badge.svg?branch=master&service=github)](https://coveralls.io/github/Overdrivr/DistantIO?branch=master)
+
 # DistantIO
 Convenient framework for reading and writing variables on a microcontroller in real time
 
