@@ -1,9 +1,9 @@
 # Copyright (C) 2014 Rémi Bèges
 # For conditions of distribution and use, see copyright notice in the LICENSE file
 
-from API.SerialPort import SerialPort
-from API.DistantIO import DistantIO
-from API.Protocol import Protocol
+from .SerialPort import SerialPort
+from .distantio_protocol import distantio_protocol
+from .Protocol import Protocol
 from signalslot import Signal
 from threading import *
 
@@ -17,7 +17,7 @@ class Model():
 
         self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
         self.protocol = Protocol(self.on_frame_decoded_callback)
-        self.distantio = DistantIO(self.on_tx_frame_callback)
+        self.distantio = distantio_protocol(self.on_tx_frame_callback)
 
         self.mcu_died_delay = 2.0
         self.mcu_alive_timer = None
