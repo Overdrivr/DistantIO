@@ -3,10 +3,7 @@
 
 import tkinter as Tk
 import tkinter.ttk as ttk
-try:
-    from Frames.Plot2D_Frame import *
-except:
-     from Plot2D_Frame import *
+from UI.Plot2D_Frame import *
 
 class VariableTable_Frame(ttk.LabelFrame):
     def __init__(self,parent,model,**kwargs):
@@ -210,4 +207,9 @@ class VariableTable_Frame(ttk.LabelFrame):
 
     # Callback functions
     def on_MCU_state_changed(self,alive,**kwargs):
-        print("MCU state :"+str(alive))
+        if alive:
+            self.txt_active.config(text="Alive",fg='green')
+        else:
+            self.txt_active.config(text="Disconnected",fg='blue')
+            print("MCU disconnected")
+        self.parent.update_idletasks()
