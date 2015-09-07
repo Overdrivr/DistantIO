@@ -32,7 +32,7 @@ class Model():
 
     def disconnect(self):
         self.serial.disconnect()
-
+        self.signal_MCU_state_changed.emit(alive=False)
         self.mcu_alive_timer.cancel()
         self.mcu_alive_timer.join()
 
@@ -87,7 +87,6 @@ class Model():
             self.signal_MCU_state_changed.emit(alive=True)
 
     def on_mcu_lost_connection(self):
-        print("Lost connection")
         self.signal_MCU_state_changed.emit(alive=False)
 
         # TX : distantio to serial
