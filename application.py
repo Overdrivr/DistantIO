@@ -6,8 +6,8 @@ import tkinter.ttk as ttk
 
 from API.Model import Model
 
-from Frames.COM_Frame import COM_Frame
-from Frames.VariableTable_Frame import VariableTable_Frame
+from UI.COM_Frame import COM_Frame
+from UI.VariableTable_Frame import VariableTable_Frame
 
 class Application(ttk.Frame):
     def __init__(self,parent,**kwargs):
