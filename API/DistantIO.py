@@ -50,7 +50,15 @@ class DistantIO():
         # Identify command
         cmd = frame[0]
 
-        # Alive signal
+        # Alive command
         if cmd == 0x03:
             returned_instruction['type'] = 'alive-signal'
+            return returned_instruction
+
+        # returned-descriptor command
+        if cmd == 0x00:
+            returned_instruction['type'] = 'returned-descriptor'
+            returned_instruction['var-id'] = unpack('H',frame[1:2])[0]
+            returned_instruction['var-type'] = unpack('B',frame[3])[0]
+            returned_instruction['name'] = unpack('c',frame[4:-3])[0]
             return returned_instruction
