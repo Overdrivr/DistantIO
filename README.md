@@ -30,14 +30,6 @@ A GUI build with Tkinter is also supplied for communicating and debugging the MC
 ![gui main control screenshot](https://raw.githubusercontent.com/Overdrivr/DistantIO/master/gui_main_control.png)
 ![gui plot screenshot](https://raw.githubusercontent.com/Overdrivr/DistantIO/master/gui_plot.png)
 
-## Supported Hardware
-### "Freedom" board
-"Freedom FRDM-KL25Z board" - Development platform for Freescale Kinetis L series MCU (Processor ARM Cortex M0+)
-http://www.freescale.com/webapp/sps/site/prod_summary.jsp?code=FRDM-KL25Z
-
-### Arduino
-To be done.
-
 ## Requirements
 ### Serial port drivers
 Usb serial port drivers (PEDrivers_install.exe) are available at :
@@ -54,3 +46,6 @@ Python 3.4.2 minimum (https://www.python.org/downloads/)
 * pyserial
 * pyttk
 * PyPubSub
+
+## Setup
+-> Add parent folder of DistantIO to PYTHONPATH
