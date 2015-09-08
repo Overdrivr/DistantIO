@@ -41,7 +41,42 @@ def test_decode_0x00():
     assert response['type'] == 'returned-descriptor'
     assert response['var-id'] == var_id
     assert response['var-name'] == formatted_name
-    assert response['var-type'] == distantio.format_lookup[fmt]
+    assert response['var-type'] == fmt
+    assert response['var-writeable'] == False
+
+def test_decode_0x00_writeable():
+
+    def rx(c):
+        pass
+
+    distantio = distantio_protocol(rx)
+
+    # inputs
+    var_id = 38153
+    name = "testvar"
+    fmt = 0xF3
+
+    # formatting
+    formatted_name = "{:8s}".format(name)
+    v = (var_id).to_bytes(2,byteorder='big')
+    n = bytes(formatted_name,'ascii')
+
+    frame = bytearray()
+    frame.append(0x00)
+    frame += v
+    frame.append(fmt)
+    frame += n
+
+    crc = crc16(frame).to_bytes(2,byteorder='big')
+
+    frame += crc
+    response = distantio.process(frame)
+
+    assert response['type'] == 'returned-descriptor'
+    assert response['var-id'] == var_id
+    assert response['var-name'] == formatted_name
+    assert response['var-type'] ==  fmt & 0x0F
+    assert response['var-writeable'] == True
 
 def test_decode_float():
 
@@ -73,7 +108,7 @@ def test_decode_float():
     assert response['type'] == 'returned-value'
     assert response['var-id'] == var_id
     assert round(response['var-value'],5) == round(value,5)
-    assert response['var-type'] == distantio.format_lookup[fmt]
+    assert response['var-type'] == fmt
 
 def test_decode_int():
 
@@ -105,7 +140,7 @@ def test_decode_int():
     assert response['type'] == 'returned-value'
     assert response['var-id'] == var_id
     assert response['var-value'] == value
-    assert response['var-type'] == distantio.format_lookup[fmt]
+    assert response['var-type'] == fmt
 
 def test_decode_writeable_int():
 
@@ -121,7 +156,7 @@ def test_decode_writeable_int():
 
     # formatting
     v = (var_id).to_bytes(2,byteorder='big')
-    n = pack(distantio.format_lookup[fmt],value)
+    n = pack(distantio.format_lookup[fmt & 0x0F],value)
 
     frame = bytearray()
     frame.append(0x01)
@@ -137,7 +172,7 @@ def test_decode_writeable_int():
     assert response['type'] == 'returned-value'
     assert response['var-id'] == var_id
     assert response['var-value'] == value
-    assert response['var-type'] == distantio.format_lookup[fmt]
+    assert response['var-type'] == fmt & 0x0F
 
 # test decoding valid alive-signal frame
 def test_decode_0x03():
@@ -213,7 +248,7 @@ def test_decode_wrong_format():
     frame = bytearray()
     frame.append(0x00)
     frame += v
-    frame.append(0x10)
+    frame.append(0x09)
     frame += n
 
     crc = crc16(frame).to_bytes(2,byteorder='big')
