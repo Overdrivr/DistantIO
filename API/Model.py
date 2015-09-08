@@ -14,30 +14,32 @@ class Model():
         self.signal_disconnected = Signal()
         self.signal_connecting = Signal()
         self.signal_MCU_state_changed = Signal(args=['alive'])
+        self.signal_received_descriptor = Signal(args=['var_id','var_type','var_name'])
+        self.signal_received_value = Signal(args=['var_id','var_type','value'])
 
         self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
         self.protocol = Protocol(self.on_frame_decoded_callback)
         self.distantio = distantio_protocol(self.on_tx_frame_callback)
 
         self.mcu_died_delay = 2.0
-        self.mcu_alive_timer = None
+        self.mcu_alive_timer = Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
 
 
     def connect(self,port,baudrate=115200):
         self.signal_connecting.emit()
         self.serial.connect(port,baudrate)
 
-        self.mcu_alive_timer = Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
         self.mcu_alive_timer.start()
 
     def disconnect(self):
         self.serial.disconnect()
         self.signal_MCU_state_changed.emit(alive=False)
         self.mcu_alive_timer.cancel()
-        self.mcu_alive_timer.join()
+        if self.mcu_alive_timer.isAlive():
+            self.mcu_alive_timer.join()
 
     def finish(self):
-        self.serial.disconnect()
+        self.disconnect()
         self.serial.stop()
         self.serial.join()
 
@@ -67,12 +69,18 @@ class Model():
 
         # RX : protocol to distantio
     def on_frame_decoded_callback(self,frame):
-        instruction = self.distantio.process(frame)
-
-        # If distantio processing requires no further action
-        if instruction is None:
+        try:
+            instruction = self.distantio.process(frame)
+        except IndexError as e:
+            print(str(e))
+            print("Continuing happily.")
             return
-        if instruction['type'] is None:
+        except ValueError as e:
+            print(str(e))
+            print("Continuing happily.")
+            return
+        except:
+            print("Unkown exception in Model.on_frame_decoded_callback.")
             return
 
         # If distantio received a alive signal
@@ -85,6 +93,18 @@ class Model():
 
             self.mcu_alive_timer.start()
             self.signal_MCU_state_changed.emit(alive=True)
+
+        # if returned-value
+        elif instruction['type'] == 'returned-value':
+            self.signal_received_value.emit(var_id=instruction['var-id'],
+                                            var_type=instruction['var-type'],
+                                            value=instruction['var-value'])
+        # if returned-descriptor
+        elif instruction['type'] == 'returned-descriptor':
+            self.signal_received_descriptor.emit(var_id=instruction['var-id'],
+                                                 var_type=instruction['var-type'],
+                                                 var_name=instruction['var-name'])
+
 
     def on_mcu_lost_connection(self):
         self.signal_MCU_state_changed.emit(alive=False)
