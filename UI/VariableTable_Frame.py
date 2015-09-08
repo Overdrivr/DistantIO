@@ -3,7 +3,7 @@
 
 import tkinter as Tk
 import tkinter.ttk as ttk
-from UI.Plot2D_Frame import *
+from UI.Plot2D_Frame import Plot2D_Frame
 
 class VariableTable_Frame(ttk.LabelFrame):
     def __init__(self,parent,model,**kwargs):
@@ -29,9 +29,15 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.bouton_clear = ttk.Button(self, text="clear", command = self.remove_descriptors)
         self.bouton_clear.grid(column=2,row=1,sticky='ENW',pady=3,padx=3)
 
+        self.txt_read = Tk.Label(self,text="Read all variables :")
+        self.txt_read.grid(column=0,row=2,sticky='ENW',pady=3,padx=3)
+
+        self.check_read = ttk.Checkbutton(self,command=self.on_checkbutton_changed)
+        self.check_read.grid(column=1,row=2)
+
         # Table + scrollbar group
         self.table_frame = ttk.Frame(self)
-        self.table_frame.grid(column=0,row=2,columnspan=3, sticky="WENS")
+        self.table_frame.grid(column=0,row=3,columnspan=3, sticky="WENS")
 
         self.scrollbar_log = ttk.Scrollbar(self.table_frame)
         self.scrollbar_log.grid(sticky ='WNS',row=0,column=2)
@@ -60,22 +66,22 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.variable.set("No var")
 
         self.selected_var = ttk.Label(self,textvariable=self.variable)
-        self.selected_var.grid(column=0,row=3,columnspan=2,sticky="NSEW",pady=3,padx=3)
+        self.selected_var.grid(column=0,row=4,columnspan=2,sticky="NSEW",pady=3,padx=3)
 
         # bouton plot:
         self.bouton_plot = ttk.Button(self, text="Plot", command = self.plot_var)
-        self.bouton_plot.grid(column=2, row=3, sticky='WENS', pady=3, padx=3)
+        self.bouton_plot.grid(column=2, row=4, sticky='WENS', pady=3, padx=3)
 
         # fixed label
         self.label_var2 = ttk.Label(self,text="Value :")
-        self.label_var2.grid(column=0,row=4, sticky="NSEW",pady=3,padx=3)
+        self.label_var2.grid(column=0,row=5, sticky="NSEW",pady=3,padx=3)
 
         #Variable read/write value
         self.value = Tk.DoubleVar()
         self.value.set(0.0)
 
         self.label_var2 = ttk.Entry(self,textvariable=self.value)
-        self.label_var2.grid(column=1,row=4, sticky="NSEW",pady=3,padx=3)
+        self.label_var2.grid(column=1,row=5, sticky="NSEW",pady=3,padx=3)
 
         # Write button
         self.bouton_write = ttk.Button(self, text="WRITE", command = self.write_value)
@@ -106,12 +112,10 @@ class VariableTable_Frame(ttk.LabelFrame):
         x = self.var_list.get_children()
         for item in x:
             self.var_list.delete(item)
+        # Empty variable list
+        self.variables = dict()
 
-    def listener_COM_connected(self,port):
-        # We activate the distant IO controller immediately after the COM port was connected
-        self.activate_log()
-
-    def on_descriptor_received(self,var_id,var_type,var_name,**kwargs):
+    def on_descriptor_received(self,var_id,var_type,var_name,var_writeable,**kwargs):
         # Check if variable is already inside ?
 
         if not var_id in self.variables:
@@ -123,15 +127,16 @@ class VariableTable_Frame(ttk.LabelFrame):
             self.variables[var_id]['id'] = var_id
             self.variables[var_id]['type'] = var_type
             self.variables[var_id]['index'] = i
+            self.variables[var_id]['writeable'] = var_writeable
 
             self.var_list.set(i,'name',var_name)
             self.var_list.set(i,'type',var_type)
             self.var_list.set(i,'ID',var_id)
 
-    def on_value_received(self,var_id,var_type,value,**kwargs):
+    def on_value_received(self,var_id,var_type,var_value,**kwargs):
         print(var_id)
         print(var_type)
-        print(value)
+        print(var_value)
         """
         if self.selected_var_id is None:
             return
@@ -151,14 +156,8 @@ class VariableTable_Frame(ttk.LabelFrame):
             self.defined_first = True
         """
 
-    def change_state(self,state):
-        if state == "inprocess":
-            self.txt_active.config(text="Waiting table",fg="orange")
-        elif state == "active":
-            self.txt_active.config(text="Alive",fg='green')
-        else:
-            self.txt_active.config(text="Disconnected",fg='blue')
-        self.parent.update_idletasks()
+    def on_checkbutton_changed(self,value):
+        print(value)
 
     def write_value(self):
         # Find selected variable
@@ -187,11 +186,6 @@ class VariableTable_Frame(ttk.LabelFrame):
         if not var_id in self.variables:
             print("Logger_Frame error : ID not found :",self.var_list.set(it,column='ID'))
             return
-
-        # Tell Variable manager we are stopped with former var
-        # and we need the new one
-        pub.sendMessage('stop_using_var',varid=self.selected_var_id)
-        pub.sendMessage('using_var',varid=var_id)
 
         self.selected_var_id = var_id
 
