@@ -14,8 +14,8 @@ class Model():
         self.signal_disconnected = Signal()
         self.signal_connecting = Signal()
         self.signal_MCU_state_changed = Signal(args=['alive'])
-        self.signal_received_descriptor = Signal(args=['var_id','var_type','var_name'])
-        self.signal_received_value = Signal(args=['var_id','var_type','value'])
+        self.signal_received_descriptor = Signal(args=['var_id','var_type','var_name','var_writeable'])
+        self.signal_received_value = Signal(args=['var_id','var_type','var_value'])
 
         self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
         self.protocol = Protocol(self.on_frame_decoded_callback)
@@ -24,11 +24,12 @@ class Model():
         self.mcu_died_delay = 2.0
         self.mcu_alive_timer = Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
 
+        self.variable_list = dict()
 
     def connect(self,port,baudrate=115200):
         self.signal_connecting.emit()
         self.serial.connect(port,baudrate)
-
+        self.mcu_alive_timer = Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
         self.mcu_alive_timer.start()
 
     def disconnect(self):
@@ -59,8 +60,12 @@ class Model():
         frame = self.protocol.encode(frame)
         self.serial.write(frame)
 
-    def request_read(self):
-        pass
+    # Ask the MCU to read all variables
+    def request_read_all(self):
+        for key in variable_list:
+            frame = self.distantio.get_start_readings_frame(key,variable_list[key]['type'])
+            frame = self.protocol.encode(frame)
+            self.serial.write(frame)
 
     ## Callbacks
         # RX : serial to protocol
@@ -101,9 +106,16 @@ class Model():
                                             value=instruction['var-value'])
         # if returned-descriptor
         elif instruction['type'] == 'returned-descriptor':
+            if not instruction['var-id'] in self.variable_list:
+                self.variable_list[instruction['var-id']] = dict()
+                self.variable_list[instruction['var-id']]['type'] = instruction['var-type']
+                self.variable_list[instruction['var-id']]['name'] = ['var-name']
+                self.variable_list[instruction['var-id']]['writeable'] = ['var-writeable']
+
             self.signal_received_descriptor.emit(var_id=instruction['var-id'],
                                                  var_type=instruction['var-type'],
-                                                 var_name=instruction['var-name'])
+                                                 var_name=instruction['var-name'],
+                                                 var_writeable=instruction['var-writeable'])
 
 
     def on_mcu_lost_connection(self):
