@@ -14,14 +14,20 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.define_first = False
         self.variables = dict()
 
-        self.txt_log = Tk.Label(self,text="STATUS :")
+        self.txt_log = Tk.Label(self,text="MCU status :")
         self.txt_log.grid(column=0,row=0,sticky='ENW',pady=3,padx=3)
 
-        self.txt_active = Tk.Label(self,text="Disconnected",fg='blue',borderwidth=2)
+        self.txt_active = Tk.Label(self,text="disconnected",fg='blue',borderwidth=2)
         self.txt_active.grid(column=1,row=0,sticky='ENW',pady=3,padx=3)
 
-        self.bouton_activate = ttk.Button(self, text="RETRIEVE TABLE", command = self.activate_log)
-        self.bouton_activate.grid(column=0,row=1,sticky='ENW',pady=3,padx=3)
+        self.txt_table = Tk.Label(self,text="Variable table :")
+        self.txt_table.grid(column=0,row=1,sticky='ENW',pady=3,padx=3)
+
+        self.bouton_activate = ttk.Button(self, text="request all", command = self.request_descriptors)
+        self.bouton_activate.grid(column=1,row=1,sticky='ENW',pady=3,padx=3)
+
+        self.bouton_clear = ttk.Button(self, text="clear", command = self.remove_descriptors)
+        self.bouton_clear.grid(column=2,row=1,sticky='ENW',pady=3,padx=3)
 
         # Table + scrollbar group
         self.table_frame = ttk.Frame(self)
@@ -31,19 +37,21 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.scrollbar_log.grid(sticky ='WNS',row=0,column=2)
 
 
-        self.var_list = ttk.Treeview(self.table_frame, show="headings",columns=("name","type","size","Value","ID"),selectmode="browse", yscrollcommand=self.scrollbar_log.set)
+        self.var_list = ttk.Treeview(self.table_frame, show="headings",columns=("name","type","Value","ID"),selectmode="browse", yscrollcommand=self.scrollbar_log.set)
         self.var_list.grid(column=0,row=0,sticky='EWNS',pady=3,padx=(3,0))#columnspan=2
-        self.var_list.column('name',anchor='center',minwidth=0,width=100)
 
+        self.var_list.column('name',anchor='center',minwidth=0,width=120,stretch=Tk.NO)
         self.var_list.heading('name', text='name')
+
         self.var_list.column('type',anchor='center',minwidth=0,width=50, stretch=Tk.NO)
         self.var_list.heading('type', text='type')
-        self.var_list.column('size',anchor='center',minwidth=0,width=50, stretch=Tk.NO)
-        self.var_list.heading('size', text='size')
-        self.var_list.column('Value', anchor='center', minwidth=0, width=50, stretch=Tk.NO)
+
+        self.var_list.column('Value', anchor='center', minwidth=0, width=120, stretch=Tk.NO)
         self.var_list.heading('Value', text='Value')
-        self.var_list.column('ID',anchor='center',minwidth=0,width=3, stretch=Tk.NO)
+
+        self.var_list.column('ID',anchor='center',minwidth=0,width=30, stretch=Tk.NO)
         self.var_list.heading('ID', text='ID')
+
         self.var_list.bind("<<TreeviewSelect>>", self.variable_selected)
         self.scrollbar_log.config( command=self.var_list.yview)
 
@@ -87,41 +95,44 @@ class VariableTable_Frame(ttk.LabelFrame):
 
         # Subscriptions
         self.model.signal_MCU_state_changed.connect(self.on_MCU_state_changed)
-        #pub.subscribe(self.listener_value_received,'var_value_update')
-        #pub.subscribe(self.listener_table_received,'logtable_update')
+        self.model.signal_received_value.connect(self.on_value_received)
+        self.model.signal_received_descriptor.connect(self.on_descriptor_received)
 
-    def activate_log(self):
-        # Activate serial data interception
-        self.change_state("inprocess")
-        # Start logger
+    def request_descriptors(self):
         self.model.request_descriptors()
 
-    def listener_COM_connected(self,port):
-        # We activate the distant IO controller immediately after the COM port was connected
-        self.activate_log()
-
-    def listener_table_received(self,varlist):
-        #pub.sendMessage("new_var_selected",varid=None)#TO CHECK IF WORKS
-        self.variables = varlist
-
-        # Signal new state
-        self.change_state(state="active")
-
+    def remove_descriptors(self):
         # Empty table
         x = self.var_list.get_children()
         for item in x:
             self.var_list.delete(item)
 
-        # Fill table with new values
-        for key in self.variables:
-            i = self.var_list.insert('','end')
-            self.var_list.set(i,'name',self.variables[key]['name'])
-            self.var_list.set(i,'type',self.variables[key]['datatype'])
-            self.var_list.set(i,'size',self.variables[key]['octets'])
-           # self.var_list.set(i,'Value',self.variables[key]['value_list'][0])
-            self.var_list.set(i,'ID',key)
+    def listener_COM_connected(self,port):
+        # We activate the distant IO controller immediately after the COM port was connected
+        self.activate_log()
 
-    def listener_value_received(self,varid,data):
+    def on_descriptor_received(self,var_id,var_type,var_name,**kwargs):
+        # Check if variable is already inside ?
+
+        if not var_id in self.variables:
+            i = self.var_list.insert('','end')
+
+            self.variables[var_id] = dict()
+            self.variables[var_id]['name'] = var_name
+            self.variables[var_id]['value'] = 0
+            self.variables[var_id]['id'] = var_id
+            self.variables[var_id]['type'] = var_type
+            self.variables[var_id]['index'] = i
+
+            self.var_list.set(i,'name',var_name)
+            self.var_list.set(i,'type',var_type)
+            self.var_list.set(i,'ID',var_id)
+
+    def on_value_received(self,var_id,var_type,value,**kwargs):
+        print(var_id)
+        print(var_type)
+        print(value)
+        """
         if self.selected_var_id is None:
             return
 
@@ -138,7 +149,7 @@ class VariableTable_Frame(ttk.LabelFrame):
         if not self.defined_first:
             self.value.set(round(data['values'][0],4))
             self.defined_first = True
-
+        """
 
     def change_state(self,state):
         if state == "inprocess":
