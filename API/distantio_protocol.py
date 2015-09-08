@@ -9,13 +9,13 @@ class distantio_protocol():
         self.variables = []
         self.on_tx_frame_callback = on_tx_frame_callback
         self.payload_size = 14
-        self.format_lookup = {0 : '>d',
-                              1 : '>B',
-                              2 : '>H',
-                              3 : '>I',
-                              4 : '>b',
-                              5 : '>h',
-                              6 : '>i'}
+        self.format_lookup = {0 : '>xxxxf',
+                              1 : '>xxxxxxxB',
+                              2 : '>xxxxxxH',
+                              3 : '>xxxxI',
+                              4 : '>xxxxxxxb',
+                              5 : '>xxxxxxh',
+                              6 : '>xxxxi'}
 
     # Returns the get-descriptors frame
     def get_descriptors_frame(self):
@@ -30,9 +30,54 @@ class distantio_protocol():
         packet[13] = crc[1]
         return packet
 
-    def write_variable_frame(self, cmd_id,variable_id,data):
+    # Returns the write-value frame
+    def get_write_variable_frame(self,variable_id,variable_type,value):
         packet = bytearray(14)
-        print(packet)
+
+        packet[0] = 0x04
+        packet[1:3] = variable_id.to_bytes(2,byteorder='big')
+        packet[3] = variable_type
+        packet[4:12] = pack(self.format_lookup[variable_type],value)
+        packet[12:] = crc16(packet[:-2]).to_bytes(2,byteorder='big')
+
+        return packet
+
+    # Returns the start-reading frame
+    def get_start_readings_frame(self,variable_id,variable_type):
+        packet = bytearray(14)
+
+        packet[0] = 0x05
+        packet[1:3] = variable_id.to_bytes(2,byteorder='big')
+        packet[3] = variable_type
+        packet[4] = 0xEE
+        packet[11] = 0xEE
+        packet[12:] = crc16(packet[:-2]).to_bytes(2,byteorder='big')
+
+        return packet
+
+    # Returns the stop-reading frame
+    def get_stop_readings_frame(self,variable_id,variable_type):
+        packet = bytearray(14)
+
+        packet[0] = 0x06
+        packet[1:3] = variable_id.to_bytes(2,byteorder='big')
+        packet[3] = variable_type
+        packet[4] = 0xDD
+        packet[11] = 0xDD
+        packet[12:] = crc16(packet[:-2]).to_bytes(2,byteorder='big')
+
+        return packet
+
+    # Returns the stop-all frame
+    def get_stop_read_all_values_frame(self,variable_id):
+        packet = bytearray(14)
+
+        packet[0] = 0x07
+        packet[4] = 0xCC
+        packet[11] = 0xCC
+        packet[12:] = crc16(packet[:-2]).to_bytes(2,byteorder='big')
+
+        return packet
 
     def process(self,frame):
         returned_instruction = dict()
@@ -47,7 +92,7 @@ class distantio_protocol():
         crc_ref = crc16(frame[:-2])
 
         if crc_frame != crc_ref:
-            raise ValueError("CRCs do not match, crc frame : "+str(crc_frame)+" versus reference :"+str(crc_ref))
+            raise ValueError("CRCs do not match, crc frame : "+str(crc_frame)+" versus reference :"+str(crc_ref)+". Full frame:"+str(frame))
 
         # Identify command
         cmd = frame[0]
@@ -75,7 +120,7 @@ class distantio_protocol():
             returned_instruction['var-id'] = unpack('>H',frame[1:3])[0]
 
             # Check format is valid
-            raw_format = frame[3]
+            raw_format = frame[3] 
             if raw_format < 0 or raw_format > 6:
                 raise ValueError("Received format identifier "+str(frame)+" unknown.")
 
