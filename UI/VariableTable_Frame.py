@@ -32,7 +32,8 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.txt_read = Tk.Label(self,text="Read all variables :")
         self.txt_read.grid(column=0,row=2,sticky='ENW',pady=3,padx=3)
 
-        self.check_read = ttk.Checkbutton(self,command=self.on_checkbutton_changed)
+        self.checkbutton_state = Tk.IntVar()
+        self.check_read = ttk.Checkbutton(self,command=self.on_checkbutton_changed,variable=self.checkbutton_state)
         self.check_read.grid(column=1,row=2)
 
         # Table + scrollbar group
@@ -43,7 +44,7 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.scrollbar_log.grid(sticky ='WNS',row=0,column=2)
 
 
-        self.var_list = ttk.Treeview(self.table_frame, show="headings",columns=("name","type","Value","ID"),selectmode="browse", yscrollcommand=self.scrollbar_log.set)
+        self.var_list = ttk.Treeview(self.table_frame, show="headings",columns=("name","type","value","ID"),selectmode="browse", yscrollcommand=self.scrollbar_log.set)
         self.var_list.grid(column=0,row=0,sticky='EWNS',pady=3,padx=(3,0))#columnspan=2
 
         self.var_list.column('name',anchor='center',minwidth=0,width=120,stretch=Tk.NO)
@@ -52,8 +53,8 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.var_list.column('type',anchor='center',minwidth=0,width=50, stretch=Tk.NO)
         self.var_list.heading('type', text='type')
 
-        self.var_list.column('Value', anchor='center', minwidth=0, width=120, stretch=Tk.NO)
-        self.var_list.heading('Value', text='Value')
+        self.var_list.column('value', anchor='center', minwidth=0, width=120, stretch=Tk.NO)
+        self.var_list.heading('value', text='value')
 
         self.var_list.column('ID',anchor='center',minwidth=0,width=30, stretch=Tk.NO)
         self.var_list.heading('ID', text='ID')
@@ -134,30 +135,14 @@ class VariableTable_Frame(ttk.LabelFrame):
             self.var_list.set(i,'ID',var_id)
 
     def on_value_received(self,var_id,var_type,var_value,**kwargs):
-        print(var_id)
-        print(var_type)
-        print(var_value)
-        """
-        if self.selected_var_id is None:
-            return
+        if var_id in self.variables:
+            i = self.variables[var_id]['index']
+            self.var_list.set(i,'value',var_value)
 
-        if not self.selected_var_id == varid:
-            return
 
-        #self.read_val.set(round(data['values'][0],6))
-
-        if len(data['values']) == 1:
-            item = self.var_list.selection()
-            self.var_list.set(item,column='Value', value=  data['values'][0])
-
-        # TODO : A faire seulemtn pour variable en ecriture
-        if not self.defined_first:
-            self.value.set(round(data['values'][0],4))
-            self.defined_first = True
-        """
-
-    def on_checkbutton_changed(self,value):
-        print(value)
+    def on_checkbutton_changed(self):
+        if self.checkbutton_state.get():
+            self.model.request_read_all()
 
     def write_value(self):
         # Find selected variable
