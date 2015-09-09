@@ -86,7 +86,7 @@ class VariableTable_Frame(ttk.LabelFrame):
 
         # Write button
         self.bouton_write = ttk.Button(self, text="WRITE", command = self.write_value)
-        self.bouton_write.grid(column=2,row=4,sticky='WENS',pady=3,padx=3)
+        self.bouton_write.grid(column=2,row=5,sticky='WENS',pady=3,padx=3)
 
         # redimensionnement fenetres
         self.parent.grid_columnconfigure(0,weight=1)
@@ -147,19 +147,12 @@ class VariableTable_Frame(ttk.LabelFrame):
     def write_value(self):
         # Find selected variable
         it = self.var_list.selection()
-
         # Get associated var_id
         var_id = self.var_list.set(it,column='ID')
 
-        if not var_id in self.variables:
-            print("Logger_Frame error : ID not found :",self.var_list.set(it,column='ID'))
-            return
-
-        # Get entry value
-        value = self.value.get()
-
-        # Tell API to write value
-        self.model.write_var(var_id,value)
+        if var_id in self.variables:
+            value = self.value.get()
+            self.model.request_write(var_id,value)
 
     def variable_selected(self,event):
         # Find selected variable
@@ -201,5 +194,4 @@ class VariableTable_Frame(ttk.LabelFrame):
             self.txt_active.config(text="Alive",fg='green')
         else:
             self.txt_active.config(text="Disconnected",fg='blue')
-            print("MCU disconnected")
         self.parent.update_idletasks()
