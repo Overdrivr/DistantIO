@@ -33,6 +33,12 @@ class distantio_protocol():
     def get_write_variable_frame(self,variable_id,variable_type,value):
         packet = bytearray(14)
 
+        # Cast value to chosen type
+        if variable_type == 0:
+            value = float(value)
+        else:
+            value = int(value)
+
         packet[0] = 0x04
         packet[1:3] = variable_id.to_bytes(2,byteorder='big')
         packet[3] = variable_type
