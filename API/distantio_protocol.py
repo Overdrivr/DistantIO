@@ -5,9 +5,8 @@ from DistantIO.API.crc import crc16
 from struct import pack,unpack
 
 class distantio_protocol():
-    def __init__(self,on_tx_frame_callback):
+    def __init__(self):
         self.variables = []
-        self.on_tx_frame_callback = on_tx_frame_callback
         self.payload_size = 14
         self.format_lookup = {0 : '>xxxxf',
                               1 : '>xxxxxxxB',
