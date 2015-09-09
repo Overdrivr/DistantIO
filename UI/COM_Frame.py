@@ -26,7 +26,7 @@ class COM_Frame(ttk.LabelFrame):
         self.listbox_frame = ttk.Frame(self)
         self.listbox_frame.grid(column=0,row=1,sticky='NSEW',pady=3,padx=3,columnspan=3)
 
-        self.liste = Tk.Listbox(self.listbox_frame,height=3,width=40)
+        self.liste = Tk.Listbox(self.listbox_frame,height=6,width=40)
         self.liste.grid(column=0,row=0,sticky="WENS")
 
         self.scrollbar_liste = ttk.Scrollbar(self.listbox_frame)
