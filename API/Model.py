@@ -60,9 +60,15 @@ class Model():
     # Ask the MCU to write a variable
     def request_write(self, variable_id, data):
         if variable_id in self.variable_list:
+            # Check data is number
+            try:
+                # Cast to float and see if that fails
+                dummy = float(data)
+            except ValueError:
+                return
+
             frame = self.distantio.get_write_variable_frame(variable_id,self.variable_list[variable_id]['type'],data)
             frame = self.protocol.encode(frame)
-            print(frame)
             self.serial.write(frame)
 
     # Ask the MCU to read all variables
