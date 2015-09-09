@@ -11,11 +11,7 @@ import pytest
 
 # test decoding valid returned-descriptor frame
 def test_decode_0x00():
-
-    def rx(c):
-        pass
-
-    distantio = distantio_protocol(rx)
+    distantio = distantio_protocol()
 
     # inputs
     var_id = 38153
@@ -45,11 +41,7 @@ def test_decode_0x00():
     assert response['var-writeable'] == False
 
 def test_decode_0x00_writeable():
-
-    def rx(c):
-        pass
-
-    distantio = distantio_protocol(rx)
+    distantio = distantio_protocol()
 
     # inputs
     var_id = 38153
@@ -79,11 +71,7 @@ def test_decode_0x00_writeable():
     assert response['var-writeable'] == True
 
 def test_decode_float():
-
-    def rx(c):
-        pass
-
-    distantio = distantio_protocol(rx)
+    distantio = distantio_protocol()
 
     # inputs
     var_id = 124
@@ -111,11 +99,7 @@ def test_decode_float():
     assert response['var-type'] == fmt
 
 def test_decode_int():
-
-    def rx(c):
-        pass
-
-    distantio = distantio_protocol(rx)
+    distantio = distantio_protocol()
 
     # inputs
     var_id = 124
@@ -143,11 +127,7 @@ def test_decode_int():
     assert response['var-type'] == fmt
 
 def test_decode_writeable_int():
-
-    def rx(c):
-        pass
-
-    distantio = distantio_protocol(rx)
+    distantio = distantio_protocol()
 
     # inputs
     var_id = 124
@@ -176,11 +156,7 @@ def test_decode_writeable_int():
 
 # test decoding valid alive-signal frame
 def test_decode_0x03():
-
-    def rx(c):
-        pass
-
-    distantio = distantio_protocol(rx)
+    distantio = distantio_protocol()
 
     data = [0x03,0x00,0x00,0x00,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17]
     frame = bytearray(data)
@@ -192,11 +168,7 @@ def test_decode_0x03():
     assert response['type'] == 'alive-signal'
 
 def test_decode_wrong_crc():
-
-    def rx(c):
-        pass
-
-    distantio = distantio_protocol(rx)
+    distantio = distantio_protocol()
 
     var_id = (38153).to_bytes(2,byteorder='big')
     n = bytes("{:8s}".format("testvar"),'ascii')
@@ -214,11 +186,7 @@ def test_decode_wrong_crc():
     assert pytest.raises(ValueError,distantio.process,frame)
 
 def test_decode_wrong_size():
-
-    def rx(c):
-        pass
-
-    distantio = distantio_protocol(rx)
+    distantio = distantio_protocol()
 
     var_id = (38153).to_bytes(2,byteorder='big')
     n = bytes("{:8s}".format("testvar"),'ascii')
@@ -231,12 +199,8 @@ def test_decode_wrong_size():
 
     assert pytest.raises(IndexError,distantio.process,frame)
 
-def test_decode_wrong_format():
-
-    def rx(c):
-        pass
-
-    distantio = distantio_protocol(rx)
+def test_decode_wrong_format_0x00():
+    distantio = distantio_protocol()
 
     var_id = 38153
     name = "testvar"
@@ -249,6 +213,48 @@ def test_decode_wrong_format():
     frame.append(0x00)
     frame += v
     frame.append(0x09)
+    frame += n
+
+    crc = crc16(frame).to_bytes(2,byteorder='big')
+    frame += crc
+
+    assert pytest.raises(ValueError,distantio.process,frame)
+
+def test_decode_wrong_format_0x01():
+    distantio = distantio_protocol()
+
+    var_id = 38153
+    name = "testvar"
+    formatted_name = "{:8s}".format(name)
+
+    v = (var_id).to_bytes(2,byteorder='big')
+    n = bytes(formatted_name,'ascii')
+
+    frame = bytearray()
+    frame.append(0x01)
+    frame += v
+    frame.append(0x09)
+    frame += n
+
+    crc = crc16(frame).to_bytes(2,byteorder='big')
+    frame += crc
+
+    assert pytest.raises(ValueError,distantio.process,frame)
+
+def test_decode_wrong_cmd():
+    distantio = distantio_protocol()
+
+    var_id = 38153
+    name = "testvar"
+    formatted_name = "{:8s}".format(name)
+
+    v = (var_id).to_bytes(2,byteorder='big')
+    n = bytes(formatted_name,'ascii')
+
+    frame = bytearray()
+    frame.append(0x09)
+    frame += v
+    frame.append(0x00)
     frame += n
 
     crc = crc16(frame).to_bytes(2,byteorder='big')
