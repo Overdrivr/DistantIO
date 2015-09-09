@@ -13,6 +13,7 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.selected_var_id = None
         self.define_first = False
         self.variables = dict()
+        self.plots = []
 
         self.txt_log = Tk.Label(self,text="MCU status :")
         self.txt_log.grid(column=0,row=0,sticky='ENW',pady=3,padx=3)
@@ -70,7 +71,7 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.selected_var.grid(column=0,row=4,columnspan=2,sticky="NSEW",pady=3,padx=3)
 
         # bouton plot:
-        self.bouton_plot = ttk.Button(self, text="Plot", command = self.plot_var)
+        self.bouton_plot = ttk.Button(self, text="Plot", command = self.plot)
         self.bouton_plot.grid(column=2, row=4, sticky='WENS', pady=3, padx=3)
 
         # fixed label
@@ -151,7 +152,11 @@ class VariableTable_Frame(ttk.LabelFrame):
         var_id = self.var_list.set(it,column='ID')
 
         if var_id in self.variables:
-            value = self.value.get()
+            # If that fails, it means the string is unvalid
+            try:
+                value = self.value.get()
+            except:
+                return
             self.model.request_write(var_id,value)
 
     def variable_selected(self,event):
@@ -162,7 +167,6 @@ class VariableTable_Frame(ttk.LabelFrame):
         var_id = self.var_list.set(it,column='ID')
 
         if not var_id in self.variables:
-            print("Logger_Frame error : ID not found :",self.var_list.set(it,column='ID'))
             return
 
         self.selected_var_id = var_id
@@ -176,17 +180,24 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.defined_first = False
 
 
-    def plot_var(self):
-        # TODO :Faire une liste des fenetres et les fermer a la fin
-        self.plot = Tk.Toplevel()
-        if self.selected_var_id in self.variables:
-            self.plot.title("Ploting : " + self.variables[self.selected_var_id]['name'])
-        else:
-            self.plot.title("Plotting : none")
-        self.plot_frame = Plot2D_Frame(self.plot,self.model,self.plot,self)
-        self.plot.protocol('WM_DELETE_WINDOW', self.plot_frame.stop)
-        self.plot.minsize(width=300, height=200)
-        self.plot_frame.add_var_to_plot()
+    def plot(self):
+        # Find selected variable
+        it = self.var_list.selection()
+
+        # Get associated var_id
+        var_id = self.var_list.set(it,column='ID')
+
+        if not var_id in self.variables:
+            return
+
+        plot = Plot2D_Frame(Tk.Toplevel(),var_id)
+        plot.pack()
+        self.model.signal_received_value.connect(plot.on_value_received)
+        self.plots.append(plot)
+
+        #plot.protocol('WM_DELETE_WINDOW', self.plot_frame.stop)
+        #plot.minsize(width=300, height=200)
+
 
     # Callback functions
     def on_MCU_state_changed(self,alive,**kwargs):
