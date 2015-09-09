@@ -19,7 +19,7 @@ class Model():
 
         self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
         self.protocol = Protocol(self.on_frame_decoded_callback)
-        self.distantio = distantio_protocol(self.on_tx_frame_callback)
+        self.distantio = distantio_protocol()
 
         self.mcu_died_delay = 2.0
         self.mcu_alive_timer = Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
@@ -62,8 +62,8 @@ class Model():
 
     # Ask the MCU to read all variables
     def request_read_all(self):
-        for key in variable_list:
-            frame = self.distantio.get_start_readings_frame(key,variable_list[key]['type'])
+        for key in self.variable_list:
+            frame = self.distantio.get_start_readings_frame(key,self.variable_list[key]['type'])
             frame = self.protocol.encode(frame)
             self.serial.write(frame)
 
@@ -103,7 +103,7 @@ class Model():
         elif instruction['type'] == 'returned-value':
             self.signal_received_value.emit(var_id=instruction['var-id'],
                                             var_type=instruction['var-type'],
-                                            value=instruction['var-value'])
+                                            var_value=instruction['var-value'])
         # if returned-descriptor
         elif instruction['type'] == 'returned-descriptor':
             if not instruction['var-id'] in self.variable_list:
