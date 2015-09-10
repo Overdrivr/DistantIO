@@ -118,12 +118,15 @@ class distantio_protocol():
                 returned_instruction['group-name'] = frame[4:12].decode(encoding='UTF-8')
             else:
                 returned_instruction['type'] = 'returned-descriptor'
-                value = unpack('>H',(frame[1:3]))[0]
-                value = value & 0x3FF
-                returned_instruction['var-id'] = value
+                var_id = unpack('>H',(frame[1:3]))[0]
+                var_id = var_id & 0x3FF
+                var_group = unpack('>H',(frame[1:3]))[0]
+                var_group = (var_group >> 10) & 0x3F
+                returned_instruction['var-id'] = var_id
                 returned_instruction['var-type'] = raw_format
                 returned_instruction['var-writeable'] = ((frame[3])>>4 & 0x0F == 0x0F)
                 returned_instruction['var-name'] = frame[4:12].decode(encoding='UTF-8')
+                returned_instruction['var-group'] = var_group
             return returned_instruction
 
         # returned-value command
