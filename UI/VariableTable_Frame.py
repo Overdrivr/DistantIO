@@ -190,11 +190,12 @@ class VariableTable_Frame(ttk.LabelFrame):
         if not var_id in self.variables:
             return
 
-        plot = Plot2D_Frame(Tk.Toplevel(),var_id)
+        top = Tk.Toplevel()
+        plot = Plot2D_Frame(top,var_id)
         plot.pack()
         self.model.signal_received_value.connect(plot.on_value_received)
         self.plots.append(plot)
-
+        top.title("Plot : "+self.variables[var_id]['name'])
         #plot.protocol('WM_DELETE_WINDOW', self.plot_frame.stop)
         #plot.minsize(width=300, height=200)
 
