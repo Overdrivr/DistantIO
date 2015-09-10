@@ -14,7 +14,8 @@ class Model():
         self.signal_disconnected = Signal()
         self.signal_connecting = Signal()
         self.signal_MCU_state_changed = Signal(args=['alive'])
-        self.signal_received_descriptor = Signal(args=['var_id','var_type','var_name','var_writeable'])
+        self.signal_received_descriptor = Signal(args=['var_id','var_type','var_name','var_writeable','group_id'])
+        self.signal_received_group_descriptor = Signal(args=['group_id','group_name'])
         self.signal_received_value = Signal(args=['var_id','var_type','var_value'])
 
         self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
@@ -95,9 +96,6 @@ class Model():
             print(str(e))
             print("Continuing happily.")
             return
-        except:
-            print("Unkown exception in Model.on_frame_decoded_callback.")
-            return
 
         # If distantio received a alive signal
         if instruction['type'] == "alive-signal":
@@ -126,7 +124,12 @@ class Model():
             self.signal_received_descriptor.emit(var_id=instruction['var-id'],
                                                  var_type=instruction['var-type'],
                                                  var_name=instruction['var-name'],
-                                                 var_writeable=instruction['var-writeable'])
+                                                 var_writeable=instruction['var-writeable'],
+                                                 group_id=instruction['var-group'])
+        elif instruction['type'] == 'returned-group-descriptor':
+            self.signal_received_group_descriptor.emit(group_id=instruction['group-id'],
+                                                       group_name=instruction['group-name'])
+            pass
 
 
     def on_mcu_lost_connection(self):
