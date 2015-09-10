@@ -14,7 +14,7 @@ def test_decode_0x00():
     distantio = distantio_protocol()
 
     # inputs
-    var_id = 38153
+    var_id = 999
     name = "testvar"
     fmt = 3
 
@@ -44,7 +44,7 @@ def test_decode_0x00_writeable():
     distantio = distantio_protocol()
 
     # inputs
-    var_id = 38153
+    var_id = 999
     name = "testvar"
     fmt = 0xF3
 
@@ -95,6 +95,39 @@ def test_decode_float():
 
     assert response['type'] == 'returned-value'
     assert response['var-id'] == var_id
+    assert round(response['var-value'],5) == round(value,5)
+    assert response['var-type'] == fmt
+
+def test_decode_float_in_group():
+    distantio = distantio_protocol()
+
+    # inputs
+    # var id 124
+    # group id 0xe
+    var_id = 124
+    var_group = 0xe
+    formatted_id = ((var_group & 0x3F) << 10) + var_id
+    fmt = 0
+    value = 1.362e-12
+
+    # formatting
+    v = (formatted_id).to_bytes(2,byteorder='big')
+    n = pack(distantio.format_lookup[fmt],value)
+
+    frame = bytearray()
+    frame.append(0x01)
+    frame += v
+    frame.append(fmt)
+    frame += n
+
+    crc = crc16(frame).to_bytes(2,byteorder='big')
+
+    frame += crc
+    response = distantio.process(frame)
+
+    assert response['type'] == 'returned-value'
+    assert response['var-id'] == var_id
+    #assert response['var-group'] == 0xe
     assert round(response['var-value'],5) == round(value,5)
     assert response['var-type'] == fmt
 
