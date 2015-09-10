@@ -3,7 +3,7 @@
 
 import tkinter as Tk
 import tkinter.ttk as ttk
-from UI.Plot2D_Frame import Plot2D_Frame
+from DistantIO.UI.Plot2D_Frame import Plot2D_Frame
 
 class VariableTable_Frame(ttk.LabelFrame):
     def __init__(self,parent,model,**kwargs):
@@ -13,6 +13,7 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.selected_var_id = None
         self.define_first = False
         self.variables = dict()
+        self.groups = dict()
         self.plots = []
 
         self.txt_log = Tk.Label(self,text="MCU status :")
@@ -45,8 +46,16 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.scrollbar_log.grid(sticky ='WNS',row=0,column=2)
 
 
-        self.var_list = ttk.Treeview(self.table_frame, show="headings",columns=("name","type","value","ID"),selectmode="browse", yscrollcommand=self.scrollbar_log.set)
+        self.var_list = ttk.Treeview(self.table_frame)
+        #self.var_list['show']="headings"
+        self.var_list['columns']=("name","type","value")
+        self.var_list['selectmode']="browse"
+        self.var_list['yscrollcommand']=self.scrollbar_log.set
+
         self.var_list.grid(column=0,row=0,sticky='EWNS',pady=3,padx=(3,0))#columnspan=2
+
+        self.var_list.column('#0',anchor='center',minwidth=0,width=80,stretch=Tk.NO)
+        self.var_list.heading('#0', text='Group')
 
         self.var_list.column('name',anchor='center',minwidth=0,width=120,stretch=Tk.NO)
         self.var_list.heading('name', text='name')
@@ -56,9 +65,6 @@ class VariableTable_Frame(ttk.LabelFrame):
 
         self.var_list.column('value', anchor='center', minwidth=0, width=120, stretch=Tk.NO)
         self.var_list.heading('value', text='value')
-
-        self.var_list.column('ID',anchor='center',minwidth=0,width=30, stretch=Tk.NO)
-        self.var_list.heading('ID', text='ID')
 
         self.var_list.bind("<<TreeviewSelect>>", self.variable_selected)
         self.scrollbar_log.config( command=self.var_list.yview)
@@ -105,6 +111,8 @@ class VariableTable_Frame(ttk.LabelFrame):
         self.model.signal_MCU_state_changed.connect(self.on_MCU_state_changed)
         self.model.signal_received_value.connect(self.on_value_received)
         self.model.signal_received_descriptor.connect(self.on_descriptor_received)
+        self.model.signal_received_group_descriptor.connect(self.on_group_descriptor_received)
+
 
     def request_descriptors(self):
         self.model.request_descriptors()
@@ -117,23 +125,52 @@ class VariableTable_Frame(ttk.LabelFrame):
         # Empty variable list
         self.variables = dict()
 
-    def on_descriptor_received(self,var_id,var_type,var_name,var_writeable,**kwargs):
+    def on_descriptor_received(self,var_id,var_type,var_name,var_writeable,group_id,**kwargs):
         # Check if variable is already inside ?
 
         if not var_id in self.variables:
-            i = self.var_list.insert('','end')
-
             self.variables[var_id] = dict()
             self.variables[var_id]['name'] = var_name
             self.variables[var_id]['value'] = 0
             self.variables[var_id]['id'] = var_id
             self.variables[var_id]['type'] = var_type
-            self.variables[var_id]['index'] = i
+
             self.variables[var_id]['writeable'] = var_writeable
+            self.variables[var_id]['group'] = group_id
+
+            # If the group does not exists, we create it
+            if not group_id in self.groups:
+                # Create group
+                self.groups[group_id] = dict()
+                 # The root id of the group in the Treeview
+                 # Child items will have to be inserted beneath it
+                created_id = self.var_list.insert('','end',text="Group "+str(group_id),open=True)
+                #self.var_list.set(created_id,'#0',str(group_id))
+                self.groups[group_id]['index'] = created_id
+
+            # Now insert items
+            i = self.var_list.insert(self.groups[group_id]['index'],'end',text=str(var_id))
+            self.variables[var_id]['index'] = i
 
             self.var_list.set(i,'name',var_name)
             self.var_list.set(i,'type',var_type)
-            self.var_list.set(i,'ID',var_id)
+
+    def on_group_descriptor_received(self,group_id,group_name,**kwargs):
+        # If the group does not exists, we create it
+        if not group_id in self.groups:
+            # Create group
+            self.groups[group_id] = dict()
+             # The root id of the group in the Treeview
+             # Child items will have to be inserted beneath it
+            created_id = self.var_list.insert('','end',text=group_name,open=True)
+            #self.var_list.set(created_id,'#0',str(group_id))
+            self.groups[group_id]['index'] = created_id
+
+        # Otherwise we just correct the name
+        else:
+            created_id = self.groups[group_id]['index']
+            self.var_list.item(created_id,text=group_name)
+
 
     def on_value_received(self,var_id,var_type,var_value,**kwargs):
         if var_id in self.variables:
@@ -146,56 +183,51 @@ class VariableTable_Frame(ttk.LabelFrame):
             self.model.request_read_all()
 
     def write_value(self):
-        # Find selected variable
-        it = self.var_list.selection()
-        # Get associated var_id
-        var_id = self.var_list.set(it,column='ID')
-
-        if var_id in self.variables:
-            # If that fails, it means the string is unvalid
-            try:
-                value = self.value.get()
-            except:
-                return
-            self.model.request_write(var_id,value)
+        if not self.selected_var_id in self.variables:
+            return
+        # If that fails, it means the string is unvalid
+        try:
+            value = self.value.get()
+        except:
+            return
+        self.model.request_write(self.selected_var_id,value)
 
     def variable_selected(self,event):
-        # Find selected variable
-        it = self.var_list.selection()
+        # Get selection tree index
+        it = self.var_list.selection()[0]
 
-        # Get associated var_id
-        var_id = self.var_list.set(it,column='ID')
+        # If selection is in a variable
+        for key in self.variables:
+            if self.variables[key]['index'] == it:
+                var_id = self.variables[key]['id']
+                if not var_id in self.variables:
+                    return
 
-        if not var_id in self.variables:
-            return
+                self.selected_var_id = var_id
 
-        self.selected_var_id = var_id
+                # If selected variable is writeable
+                if self.variables[var_id]['writeable']:
+                    self.variable.set(self.variables[var_id]['name'])
+                else:
+                    self.variable.set("** Variable not writeable **")
+                return
 
-        # If selected variable is writeable
-        if self.variables[var_id]['writeable']:
-            self.variable.set(self.variables[var_id]['name'])
-        else:
-            self.variable.set("** Variable not writeable **")
-
-        self.defined_first = False
-
+        # Otherwise, if selection is a group
+        for key in self.groups:
+            if self.groups[key]['index'] == it:
+                self.selected_var_id = None
+                return
 
     def plot(self):
-        # Find selected variable
-        it = self.var_list.selection()
-
-        # Get associated var_id
-        var_id = self.var_list.set(it,column='ID')
-
-        if not var_id in self.variables:
+        if not self.selected_var_id in self.variables:
             return
 
         top = Tk.Toplevel()
-        plot = Plot2D_Frame(top,var_id)
+        plot = Plot2D_Frame(top,self.selected_var_id)
         plot.pack()
         self.model.signal_received_value.connect(plot.on_value_received)
         self.plots.append(plot)
-        top.title("Plot : "+self.variables[var_id]['name'])
+        top.title("Plot : "+self.variables[self.selected_var_id]['name'])
         #plot.protocol('WM_DELETE_WINDOW', self.plot_frame.stop)
         #plot.minsize(width=300, height=200)
 
@@ -207,3 +239,11 @@ class VariableTable_Frame(ttk.LabelFrame):
         else:
             self.txt_active.config(text="Disconnected",fg='blue')
         self.parent.update_idletasks()
+
+
+if __name__=="__main__":
+    root = Tk.Tk()
+    m = None
+    fr = VariableTable_Frame(root,m)
+    root.minsize(width=300, height=200)
+    root.mainloop()
