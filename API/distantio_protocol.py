@@ -104,29 +104,40 @@ class distantio_protocol():
 
         # returned-descriptor command
         if cmd == 0x00:
-            returned_instruction['type'] = 'returned-descriptor'
-            returned_instruction['var-id'] = unpack('>H',frame[1:3])[0]
-
             # Check format is valid
             raw_format = frame[3] & 0x0F
-            if raw_format < 0 or raw_format > 6:
+            if raw_format < 0 or raw_format > 7:
                 raise ValueError("Received format identifier "+str(raw_format)+" unknown.")
 
-            returned_instruction['var-type'] = raw_format
-            returned_instruction['var-writeable'] = ((frame[3])>>4 & 0x0F == 0x0F)
-            returned_instruction['var-name'] = frame[4:12].decode(encoding='UTF-8')
+            # Received a group descriptor
+            if raw_format == 7:
+                returned_instruction['type'] = 'returned-group-descriptor'
+                value = unpack('>H',(frame[1:3]))[0]
+                value = (value >> 10) & 0x3F
+                returned_instruction['group-id'] = value
+                returned_instruction['group-name'] = frame[4:12].decode(encoding='UTF-8')
+            else:
+                returned_instruction['type'] = 'returned-descriptor'
+                value = unpack('>H',(frame[1:3]))[0]
+                value = value & 0x3FF
+                returned_instruction['var-id'] = value
+                returned_instruction['var-type'] = raw_format
+                returned_instruction['var-writeable'] = ((frame[3])>>4 & 0x0F == 0x0F)
+                returned_instruction['var-name'] = frame[4:12].decode(encoding='UTF-8')
             return returned_instruction
 
         # returned-value command
         if cmd == 0x01:
             returned_instruction['type'] = 'returned-value'
-            returned_instruction['var-id'] = unpack('>H',frame[1:3])[0]
 
             # Check format is valid
             raw_format = frame[3] & 0x0F
             if raw_format < 0 or raw_format > 6:
                 raise ValueError("Received format identifier "+str(frame)+" unknown.")
 
+            value = unpack('>H',(frame[1:3]))[0]
+            value = value & 0x3FF
+            returned_instruction['var-id'] = value
             returned_instruction['var-type'] = raw_format
             returned_instruction['var-value'] = unpack(self.format_lookup[raw_format],frame[4:12])[0]
             return returned_instruction
