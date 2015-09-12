@@ -129,7 +129,6 @@ class Model():
         elif instruction['type'] == 'returned-group-descriptor':
             self.signal_received_group_descriptor.emit(group_id=instruction['group-id'],
                                                        group_name=instruction['group-name'])
-            pass
 
 
     def on_mcu_lost_connection(self):
