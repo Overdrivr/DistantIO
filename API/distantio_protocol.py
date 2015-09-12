@@ -3,6 +3,7 @@
 
 from DistantIO.API.crc import crc16
 from struct import pack,unpack
+import logging
 
 class distantio_protocol():
     def __init__(self):
@@ -97,7 +98,7 @@ class distantio_protocol():
         crc_ref = crc16(frame[:-2])
 
         if crc_frame != crc_ref:
-            raise ValueError("CRCs do not match, crc frame : "+str(crc_frame)+" versus reference :"+str(crc_ref)+". Full frame:"+str(frame))
+            raise ValueError("CRCs do not match, crc frame : "+str(crc_frame)+" versus reference :"+str(crc_ref))
 
         # Identify command
         cmd = frame[0]
