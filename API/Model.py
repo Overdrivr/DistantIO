@@ -5,7 +5,11 @@ from .SerialPort import SerialPort
 from .distantio_protocol import distantio_protocol
 from .Protocol import Protocol
 from signalslot import Signal
-from threading import *
+import threading
+import logging
+from logging.handlers import RotatingFileHandler
+import binascii
+import queue
 
 class Model():
     def __init__(self):
@@ -22,17 +26,43 @@ class Model():
         self.protocol = Protocol(self.on_frame_decoded_callback)
         self.distantio = distantio_protocol()
 
+        # Timer for monitoring MCU alive
         self.mcu_died_delay = 2.0
-        self.mcu_alive_timer = Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
+        self.mcu_alive_timer = threading.Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
+
+        # Timer for monitoring RX bauds
+        #self.bauds_timer = threading.Timer(1,self.recalculate_bauds)
+        #self.rx_bits_amount = 0
 
         self.variable_list = dict()
         self.connected = False
+
+        self.rx_queue = queue.Queue()
+        self.process_queue_running = True
+        self.rx_processing_thread = threading.Thread(target=self.process_queue)
+        self.rx_processing_thread.start()
+
+        # Init logging facility
+        # From : http://sametmax.com/ecrire-des-logs-en-python/
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s :: %(levelname)s :: %(message)s')
+        file_handler = RotatingFileHandler('serialstream.log', 'a', 1000000, 1)
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(logging.DEBUG)
+        logger.addHandler(stream_handler)
+
+        logger.info('DistantIO API initialized successfully.')
 
     def connect(self,port,baudrate=115200):
         if not self.connected:
             self.signal_connecting.emit()
             self.serial.connect(port,baudrate)
-            self.mcu_alive_timer = Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
+            self.mcu_alive_timer = threading.Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
             self.mcu_alive_timer.start()
 
     def disconnect(self):
@@ -47,6 +77,8 @@ class Model():
         self.disconnect()
         self.serial.stop()
         self.serial.join()
+        self.process_queue_running = False
+        self.rx_processing_thread.join()
 
     def get_ports(self):
         return self.serial.get_ports()
@@ -82,19 +114,30 @@ class Model():
     ## Callbacks
         # RX : serial to protocol
     def on_rx_data_callback(self,c):
-        self.protocol.decode(c)
+        self.rx_queue.put(c)
+
+    def process_queue(self):
+        while self.process_queue_running:
+            if not self.rx_queue.empty():
+                c = ''
+                try:
+                    c = self.rx_queue.get(block=False)
+                except Queue.EMPTY as e:
+                    logging.warning(str(e))
+                else:
+                    self.protocol.decode(c)
 
         # RX : protocol to distantio
     def on_frame_decoded_callback(self,frame):
         try:
             instruction = self.distantio.process(frame)
         except IndexError as e:
-            print(str(e))
-            print("Continuing happily.")
+            logging.warning(str(e))
+            logging.warning("frame : %s",binascii.hexlify(frame))
             return
         except ValueError as e:
-            print(str(e))
-            print("Continuing happily.")
+            logging.warning(str(e))
+            logging.warning("frame : %s",binascii.hexlify(frame))
             return
 
         # If distantio received a alive signal
@@ -103,7 +146,7 @@ class Model():
             self.mcu_alive_timer.cancel()
             self.mcu_alive_timer.join()
 
-            self.mcu_alive_timer = Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
+            self.mcu_alive_timer = threading.Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
 
             self.mcu_alive_timer.start()
             self.signal_MCU_state_changed.emit(alive=True)
