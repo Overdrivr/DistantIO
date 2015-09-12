@@ -5,6 +5,7 @@ from threading import Thread
 import serial
 from queue import Queue
 from serial.tools.list_ports import comports
+import logging
 
 #Serial data processing class
 class SerialPort(Thread):
@@ -38,12 +39,12 @@ class SerialPort(Thread):
 
         #In case no port is found
         if port_amount == 0:
-            print('No COM port found.')
+            logging.error('No COM port found.')
             self.connection_attempt_callback("NO-PORT-FOUND")
 
         #In case ports are found but not chosen one
         if port_amount > 0 and port_found == -1:
-            print(port,' port not found but others are available.')
+            logging.error("%s port not found but others are available.",port)
             self.connection_attempt_callback("OTHER-PORTS-FOUND")
 
         # If everything ok, start the connection in the thread
@@ -73,31 +74,32 @@ class SerialPort(Thread):
                 try:
                     inwaiting = self.ser.inWaiting()
                 except serial.SerialException as e:
-                    print("Caught "+str(e))
-
+                    #logging.warning("Caught %s",str(e))
+                    print(str(e))
                 if inwaiting > 0:
                     try:
                         c = self.ser.read()
                     except serial.SerialException as e:
-                        print("Caught "+str(e))
+                        #logging.warning("Caught %s",str(e))
+                        print(str(e))
                     else:
                         self.rx_data_callback(c)
 
             elif self.attempt_connect:
                 self.attempt_connect = False
                 try:
-                    print("Connecting")
+                    logging.info("Connecting...")
                     self.ser.open()
                     self.connection_attempt_callback("CONNECTED")
                 except:
-                    print("Serial port : Port ",self.ser.port," found but impossible to open. Try to physically disconnect.")
+                    logging.error("Serial port : Port %s found but impossible to open. Try to physically disconnect.",self.ser.port)
                     self.ser.close()
                     self.connection_attempt_callback("CONNECTION-ISSUE")
 
                 if self.ser.isOpen():
-                    print('Connected to port ',self.ser.port)
+                    logging.info("Connected to port %s",self.ser.port)
                     self.connection_attempt_callback(self.ser.port)
                 else:
                     self.connection_attempt_callback("UNKNOWN-CONNECTION-ISSUE")
 
-        print("Serial thread stopped.")
+        logging.info("Serial thread stopped.")
