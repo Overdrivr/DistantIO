@@ -72,12 +72,17 @@ class SerialPort(Thread):
                 inwaiting = 0
                 try:
                     inwaiting = self.ser.inWaiting()
-                except:
-                    print("Catching exception on serial port - ignore if on disconnect.")
+                except serial.SerialException as e:
+                    print("Caught "+str(e))
 
                 if inwaiting > 0:
-                    c = self.ser.read()
-                    self.rx_data_callback(c)
+                    try:
+                        c = self.ser.read()
+                    except serial.SerialException as e:
+                        print("Caught "+str(e))
+                    else:
+                        self.rx_data_callback(c)
+
             elif self.attempt_connect:
                 self.attempt_connect = False
                 try:
