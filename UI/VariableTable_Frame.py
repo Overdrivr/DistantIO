@@ -124,6 +124,7 @@ class VariableTable_Frame(ttk.LabelFrame):
             self.var_list.delete(item)
         # Empty variable list
         self.variables = dict()
+        self.groups = dict()
 
     def on_descriptor_received(self,var_id,var_type,var_name,var_writeable,group_id,**kwargs):
         # Check if variable is already inside ?
