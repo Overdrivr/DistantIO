@@ -15,12 +15,13 @@ def test_decode_0x00():
 
     # inputs
     var_id = 999
+    group_id = 18
     name = "testvar"
     fmt = 3
 
     # formatting
     formatted_name = "{:8s}".format(name)
-    v = (var_id).to_bytes(2,byteorder='big')
+    v = (var_id + (group_id << 10)).to_bytes(2,byteorder='big')
     n = bytes(formatted_name,'ascii')
 
     frame = bytearray()
@@ -39,6 +40,7 @@ def test_decode_0x00():
     assert response['var-name'] == formatted_name
     assert response['var-type'] == fmt
     assert response['var-writeable'] == False
+    assert response['var-group'] == group_id
 
 def test_decode_0x00_writeable():
     distantio = distantio_protocol()
@@ -136,11 +138,12 @@ def test_decode_int():
 
     # inputs
     var_id = 124
+    group_id = 37
     fmt = 3
     value = 126594521
 
     # formatting
-    v = (var_id).to_bytes(2,byteorder='big')
+    v = (var_id + (group_id<<10)).to_bytes(2,byteorder='big')
     n = pack(distantio.format_lookup[fmt],value)
 
     frame = bytearray()
@@ -186,6 +189,37 @@ def test_decode_writeable_int():
     assert response['var-id'] == var_id
     assert response['var-value'] == value
     assert response['var-type'] == fmt & 0x0F
+
+def test_decode_group_descriptor():
+    distantio = distantio_protocol()
+
+    # inputs
+    group_id = 39
+    fmt = 0x07
+    name = "testvar"
+
+    # formatting
+    formatted_name = "{:8s}".format(name)
+    n = bytes(formatted_name,'ascii')
+
+    # formatting
+    v = (group_id << 10).to_bytes(2,byteorder='big')
+
+
+    frame = bytearray()
+    frame.append(0x00)
+    frame += v
+    frame.append(fmt)
+    frame += n
+
+    crc = crc16(frame).to_bytes(2,byteorder='big')
+
+    frame += crc
+    response = distantio.process(frame)
+
+    assert response['type'] == 'returned-group-descriptor'
+    assert response['group-id'] == group_id
+    assert response['group-name'] == formatted_name
 
 # test decoding valid alive-signal frame
 def test_decode_0x03():
