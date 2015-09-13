@@ -9,7 +9,8 @@ import threading
 import logging
 from logging.handlers import RotatingFileHandler
 import binascii
-import queue
+from collections import deque
+import time
 
 class Model():
     def __init__(self):
@@ -30,16 +31,13 @@ class Model():
         self.mcu_died_delay = 2.0
         self.mcu_alive_timer = threading.Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
 
-        # Timer for monitoring RX bauds
-        #self.bauds_timer = threading.Timer(1,self.recalculate_bauds)
-        #self.rx_bits_amount = 0
-
         self.variable_list = dict()
         self.connected = False
 
-        self.rx_queue = queue.Queue()
-        self.process_queue_running = True
-        self.rx_processing_thread = threading.Thread(target=self.process_queue)
+        # RX Queue processing
+        self.rx_deque = deque()
+        self.process_rx_running = True
+        self.rx_processing_thread = threading.Thread(target=self.process_rx)
         self.rx_processing_thread.start()
 
         # Init logging facility
@@ -56,7 +54,9 @@ class Model():
         stream_handler.setLevel(logging.DEBUG)
         logger.addHandler(stream_handler)
 
-        logger.info('DistantIO API initialized successfully.')
+        logging.info('DistantIO API initialized successfully.')
+
+
 
     def connect(self,port,baudrate=115200):
         if not self.connected:
@@ -72,13 +72,17 @@ class Model():
         if self.mcu_alive_timer.isAlive():
             self.mcu_alive_timer.join()
         self.connected = False
+        logging.info('COM port disconnect.')
 
     def finish(self):
         self.disconnect()
         self.serial.stop()
         self.serial.join()
-        self.process_queue_running = False
+        logging.info('Serial port thread terminated.')
+        self.process_rx_running = False
         self.rx_processing_thread.join()
+        logging.info('RX processing thread terminated.')
+        logging.info('API terminated.')
 
     def get_ports(self):
         return self.serial.get_ports()
@@ -114,18 +118,17 @@ class Model():
     ## Callbacks
         # RX : serial to protocol
     def on_rx_data_callback(self,c):
-        self.rx_queue.put(c)
+        #self.rx_deque.append(c)
+        self.protocol.decode(c)
 
-    def process_queue(self):
-        while self.process_queue_running:
-            if not self.rx_queue.empty():
-                c = ''
-                try:
-                    c = self.rx_queue.get(block=False)
-                except Queue.EMPTY as e:
-                    logging.warning(str(e))
-                else:
-                    self.protocol.decode(c)
+    def process_rx(self):
+        while self.process_rx_running:
+            #while len(self.rx_deque):
+            #    c = self.rx_deque.popleft()
+            #    self.protocol.decode(c)
+            #if (len(self.rx_deque)+1) % 100 == 0:
+            #    print("queue size:"+str(len(self.rx_deque)+1))
+            time.sleep(0.1)
 
         # RX : protocol to distantio
     def on_frame_decoded_callback(self,frame):
