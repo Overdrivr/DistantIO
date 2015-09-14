@@ -39,7 +39,7 @@ class SerialPort(Thread):
 
         #In case no port is found
         if port_amount == 0:
-            logging.error('No COM port found.')
+            logging.error('no COM port found.')
             self.connection_attempt_callback("NO-PORT-FOUND")
 
         #In case ports are found but not chosen one
@@ -61,12 +61,14 @@ class SerialPort(Thread):
     def disconnect(self):
         self.ser.close()
         self.connection_attempt_callback("DISCONNECTED")
+        logging.info("SerialPort disconnected.")
 
     def stop(self):
         self.running = False
 
 
     def run(self):
+        logging.info('SerialPort thread started.')
         #Main serial loop
         while self.running:
             if self.ser.isOpen():
@@ -74,32 +76,30 @@ class SerialPort(Thread):
                 try:
                     inwaiting = self.ser.inWaiting()
                 except serial.SerialException as e:
-                    #logging.warning("Caught %s",str(e))
-                    print(str(e))
+                    logging.warning("SerialPort caught %s",str(e))
                 if inwaiting > 0:
                     try:
                         c = self.ser.read()
                     except serial.SerialException as e:
-                        #logging.warning("Caught %s",str(e))
-                        print(str(e))
+                        logging.warning("SerialPort caught %s",str(e))
                     else:
                         self.rx_data_callback(c)
 
             elif self.attempt_connect:
                 self.attempt_connect = False
                 try:
-                    logging.info("Connecting...")
+                    logging.info("Connecting to %s.",self.ser.port)
                     self.ser.open()
                     self.connection_attempt_callback("CONNECTED")
                 except:
-                    logging.error("Serial port : Port %s found but impossible to open. Try to physically disconnect.",self.ser.port)
+                    logging.error("port %s found but impossible to open. Try to physically disconnect.",self.ser.port)
                     self.ser.close()
                     self.connection_attempt_callback("CONNECTION-ISSUE")
 
                 if self.ser.isOpen():
-                    logging.info("Connected to port %s",self.ser.port)
+                    logging.info("Connected to port %s successfully.",self.ser.port)
                     self.connection_attempt_callback(self.ser.port)
                 else:
                     self.connection_attempt_callback("UNKNOWN-CONNECTION-ISSUE")
 
-        logging.info("Serial thread stopped.")
+        logging.info('SerialPort thread stopped.')
