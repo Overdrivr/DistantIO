@@ -4,6 +4,7 @@
 import tkinter as Tk
 import tkinter.ttk as ttk
 from DistantIO.UI.Plot2D_Frame import Plot2D_Frame
+import logging
 
 class VariableTable_Frame(ttk.LabelFrame):
     def __init__(self,parent,model,**kwargs):
@@ -185,12 +186,14 @@ class VariableTable_Frame(ttk.LabelFrame):
 
     def write_value(self):
         if not self.selected_var_id in self.variables:
+            logging.debug("write_value : var id "+str(self.selected_var_id)+" not found.")
             return
         # If that fails, it means the string is unvalid
         try:
-            value = self.value.get()
-        except:
-            return
+            value = float(self.value.get())
+        except ValueError as e:
+            print(str(e))
+
         self.model.request_write(self.selected_var_id,value)
 
     def variable_selected(self,event):
