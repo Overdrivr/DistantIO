@@ -34,12 +34,6 @@ class Model():
         self.variable_list = dict()
         self.connected = False
 
-        # RX Queue processing
-        self.rx_deque = deque()
-        self.process_rx_running = True
-        self.rx_processing_thread = threading.Thread(target=self.process_rx)
-        self.rx_processing_thread.start()
-
         # Init logging facility
         # From : http://sametmax.com/ecrire-des-logs-en-python/
         logger = logging.getLogger()
@@ -79,9 +73,6 @@ class Model():
         self.serial.stop()
         self.serial.join()
         logging.info('Serial port thread terminated.')
-        self.process_rx_running = False
-        self.rx_processing_thread.join()
-        logging.info('RX processing thread terminated.')
         logging.info('API terminated.')
 
     def get_ports(self):
@@ -96,17 +87,20 @@ class Model():
 
     # Ask the MCU to write a variable
     def request_write(self, variable_id, data):
-        if variable_id in self.variable_list:
-            # Check data is number
-            try:
-                # Cast to float and see if that fails
-                dummy = float(data)
-            except ValueError:
-                return
+        if not variable_id in self.variable_list:
+            logging.debug("request_write : var id provided "+str(variable_id)+" not found.")
+            return
+        # Check data is number
+        try:
+            # Cast to float and see if that fails
+            dummy = float(data)
+        except ValueError:
+            logging.debug("request_write : value provided "+str(data)+" not correct.")
+            return
 
-            frame = self.distantio.get_write_variable_frame(variable_id,self.variable_list[variable_id]['type'],data)
-            frame = self.protocol.encode(frame)
-            self.serial.write(frame)
+        frame = self.distantio.get_write_variable_frame(variable_id,self.variable_list[variable_id]['type'],data)
+        frame = self.protocol.encode(frame)
+        self.serial.write(frame)
 
     # Ask the MCU to read all variables
     def request_read_all(self):
@@ -118,17 +112,7 @@ class Model():
     ## Callbacks
         # RX : serial to protocol
     def on_rx_data_callback(self,c):
-        #self.rx_deque.append(c)
         self.protocol.decode(c)
-
-    def process_rx(self):
-        while self.process_rx_running:
-            #while len(self.rx_deque):
-            #    c = self.rx_deque.popleft()
-            #    self.protocol.decode(c)
-            #if (len(self.rx_deque)+1) % 100 == 0:
-            #    print("queue size:"+str(len(self.rx_deque)+1))
-            time.sleep(0.1)
 
         # RX : protocol to distantio
     def on_frame_decoded_callback(self,frame):
@@ -175,6 +159,8 @@ class Model():
         elif instruction['type'] == 'returned-group-descriptor':
             self.signal_received_group_descriptor.emit(group_id=instruction['group-id'],
                                                        group_name=instruction['group-name'])
+        else:
+            logging.error("Unknow instruction :"+str(instruction))
 
 
     def on_mcu_lost_connection(self):
