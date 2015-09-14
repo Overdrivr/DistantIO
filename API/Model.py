@@ -14,6 +14,20 @@ import time
 
 class Model():
     def __init__(self):
+        # Init logging facility
+        # From : http://sametmax.com/ecrire-des-logs-en-python/
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s :: %(levelname)s :: %(message)s')
+        file_handler = RotatingFileHandler('api_log.log', 'a', 1000000, 1)
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(logging.DEBUG)
+        logger.addHandler(stream_handler)
+
         # Signals
         self.signal_connected = Signal(args=['port'])
         self.signal_disconnected = Signal()
@@ -34,20 +48,6 @@ class Model():
         self.variable_list = dict()
         self.connected = False
 
-        # Init logging facility
-        # From : http://sametmax.com/ecrire-des-logs-en-python/
-        logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s :: %(levelname)s :: %(message)s')
-        file_handler = RotatingFileHandler('serialstream.log', 'a', 1000000, 1)
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-        stream_handler = logging.StreamHandler()
-        stream_handler.setLevel(logging.DEBUG)
-        logger.addHandler(stream_handler)
-
         logging.info('DistantIO API initialized successfully.')
 
 
@@ -66,14 +66,12 @@ class Model():
         if self.mcu_alive_timer.isAlive():
             self.mcu_alive_timer.join()
         self.connected = False
-        logging.info('COM port disconnect.')
 
     def finish(self):
         self.disconnect()
         self.serial.stop()
         self.serial.join()
-        logging.info('Serial port thread terminated.')
-        logging.info('API terminated.')
+        logging.info('API terminated successfully.')
 
     def get_ports(self):
         return self.serial.get_ports()
@@ -81,6 +79,7 @@ class Model():
     ### Distant IO calls to MCU
     # Ask the MCU to return all descriptors
     def request_descriptors(self):
+        logging.info('requested all descriptors to MCU.')
         frame = self.distantio.get_descriptors_frame()
         frame = self.protocol.encode(frame)
         self.serial.write(frame)
@@ -88,16 +87,17 @@ class Model():
     # Ask the MCU to write a variable
     def request_write(self, variable_id, data):
         if not variable_id in self.variable_list:
-            logging.debug("request_write : var id provided "+str(variable_id)+" not found.")
+            logging.error("variable id provided "+str(variable_id)+" not found.")
             return
         # Check data is number
         try:
             # Cast to float and see if that fails
             dummy = float(data)
         except ValueError:
-            logging.debug("request_write : value provided "+str(data)+" not correct.")
+            logging.error("value provided "+str(data)+" not correct.")
             return
 
+        logging.info('requested MCU to write '+str(data)+' to var id '+str(variable_id)+'.')
         frame = self.distantio.get_write_variable_frame(variable_id,self.variable_list[variable_id]['type'],data)
         frame = self.protocol.encode(frame)
         self.serial.write(frame)
@@ -105,6 +105,7 @@ class Model():
     # Ask the MCU to read all variables
     def request_read_all(self):
         for key in self.variable_list:
+            logging.info('requested to receive readings of var id '+str(key)+'.')
             frame = self.distantio.get_start_readings_frame(key,self.variable_list[key]['type'])
             frame = self.protocol.encode(frame)
             self.serial.write(frame)
@@ -119,12 +120,10 @@ class Model():
         try:
             instruction = self.distantio.process(frame)
         except IndexError as e:
-            logging.warning(str(e))
-            logging.warning("frame : %s",binascii.hexlify(frame))
+            logging.warning("received error "+str(e)+" with frame : %s",binascii.hexlify(frame))
             return
         except ValueError as e:
-            logging.warning(str(e))
-            logging.warning("frame : %s",binascii.hexlify(frame))
+            logging.warning("received error "+str(e)+" with frame : %s",binascii.hexlify(frame))
             return
 
         # If distantio received a alive signal
@@ -160,7 +159,7 @@ class Model():
             self.signal_received_group_descriptor.emit(group_id=instruction['group-id'],
                                                        group_name=instruction['group-name'])
         else:
-            logging.error("Unknow instruction :"+str(instruction))
+            logging.error("Unknown instruction :"+str(instruction))
 
 
     def on_mcu_lost_connection(self):
