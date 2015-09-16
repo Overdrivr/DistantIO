@@ -20,7 +20,7 @@ class Protocol():
         self.SOF = int('f7',16)
         self.EOF = int('7f',16)
         self.ESC = int('7d',16)
-        
+
         self.payload = bytearray()
         # Max amount of payloads
         self.framesize = 0;
@@ -40,7 +40,8 @@ class Protocol():
                 self.escape_state = ESC_STATE.IDLE
                 self.framesize = 0;
             else:
-                t = newbyte,
+                pass
+                #print(str(newbyte))
 
         #Frame is in process
         else:
