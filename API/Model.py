@@ -4,12 +4,13 @@
 from .SerialPort import SerialPort
 from .distantio_protocol import distantio_protocol
 from .Protocol import Protocol
+from .Worker import Worker
 from signalslot import Signal
 import threading
 import logging
 from logging.handlers import RotatingFileHandler
 import binascii
-from collections import deque
+import multiprocessing as mp
 import time
 
 class Model():
@@ -38,8 +39,26 @@ class Model():
         self.signal_received_value = Signal(args=['var_id','var_type','var_value'])
 
         self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
-        self.protocol = Protocol(self.on_frame_decoded_callback)
         self.distantio = distantio_protocol()
+        self.protocol = Protocol(self.unused)
+
+        # Queue holding received characters to be processed by worker process
+        self.input_queue = mp.Queue()
+        # Queue holding decoded frames
+        self.output_queue = mp.Queue()
+        # Conditions for controlling run process
+        self.condition_new_rx_data = mp.Event()
+        self.condition_new_rx_data.clear()
+        self.condition_run_process = mp.Event()
+        self.condition_run_process.clear()
+        # Worker process for decoding characters
+        self.worker = Worker(self.input_queue,self.output_queue,self.condition_new_rx_data,self.condition_run_process)
+        self.worker.start()
+
+        # Threaded function for decoding received frames
+        self.condition_stop_thread = threading.Event()
+        self.frame_decoding_thread = threading.Thread(target=self.process_output_queue)
+        self.frame_decoding_thread.start()
 
         # Timer for monitoring MCU alive
         self.mcu_died_delay = 2.0
@@ -49,8 +68,6 @@ class Model():
         self.connected = False
 
         logging.info('DistantIO API initialized successfully.')
-
-
 
     def connect(self,port,baudrate=115200):
         if not self.connected:
@@ -71,6 +88,16 @@ class Model():
         self.disconnect()
         self.serial.stop()
         self.serial.join()
+        logging.info('Serial thread joined.')
+        print("Notifying")
+        self.condition_new_rx_data.set()
+        self.condition_run_process.set()
+        print("Notified")
+        self.worker.join()
+        print("Joined. Notifying thread")
+        self.condition_stop_thread.set()
+        print("Notified thread.")
+        self.frame_decoding_thread.join()
         logging.info('API terminated successfully.')
 
     def get_ports(self):
@@ -110,13 +137,20 @@ class Model():
             frame = self.protocol.encode(frame)
             self.serial.write(frame)
 
+    def process_output_queue(self):
+        while not self.condition_stop_thread.is_set():
+            if not self.output_queue.empty():
+                frame = self.output_queue.get()
+                self.decode_frame(frame)
     ## Callbacks
         # RX : serial to protocol
-    def on_rx_data_callback(self,c):
-        self.protocol.decode(c)
+    def on_rx_data_callback(self,data):
+        #self.protocol.decode(c)
+        self.input_queue.put(data)
+        self.condition_new_rx_data.set()
 
         # RX : protocol to distantio
-    def on_frame_decoded_callback(self,frame):
+    def decode_frame(self,frame):
         try:
             instruction = self.distantio.process(frame)
         except IndexError as e:
@@ -175,3 +209,6 @@ class Model():
            self.signal_disconnected.emit()
         else:
            self.signal_connected.emit(port=message)
+
+    def unused(self,frame):
+        logging.error("Local protocol decoded frame "+str(frame)+" instead of Worker")
