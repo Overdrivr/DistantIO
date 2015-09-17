@@ -6,6 +6,19 @@ import serial
 from queue import Queue
 from serial.tools.list_ports import comports
 import logging
+from functools import wraps
+from time import time
+
+def timed(f):
+  @wraps(f)
+  def wrapper(*args, **kwds):
+    start = time()
+    result = f(*args, **kwds)
+    elapsed = time() - start
+    if elapsed > 0.016:
+        print("took "+str(elapsed))
+    return result
+  return wrapper
 
 #Serial data processing class
 class SerialPort(Thread):
@@ -21,6 +34,8 @@ class SerialPort(Thread):
         self.running = True
         self.attempt_connect = False
         self.start()
+
+        self.threshold = 100
 
     def connect(self,port,baudrate):
         self.ser.baudrate = baudrate
@@ -66,24 +81,35 @@ class SerialPort(Thread):
     def stop(self):
         self.running = False
 
+    @timed
+    def serialRun(self):
+        inwaiting = 0
+        try:
+            inwaiting = self.ser.inWaiting()
+        except serial.SerialException as e:
+            logging.warning("SerialPort caught %s",str(e))
+        if inwaiting > 0:
+            try:
+                data = self.ser.read(inwaiting)
+            except serial.SerialException as e:
+                logging.warning("SerialPort caught %s",str(e))
+            else:
+                #for c in list(memoryview(data)):
+                self.rx_data_callback(data)
+
+        if inwaiting > self.threshold:
+            self.threshold += 100
+            logging.info("SerialPort overload."+str(inwaiting)+" characters in buffer. New threshold at "+str(self.threshold))
+        if inwaiting < 100:
+            self.threshold = 100
+
 
     def run(self):
         logging.info('SerialPort thread started.')
         #Main serial loop
         while self.running:
             if self.ser.isOpen():
-                inwaiting = 0
-                try:
-                    inwaiting = self.ser.inWaiting()
-                except serial.SerialException as e:
-                    logging.warning("SerialPort caught %s",str(e))
-                if inwaiting > 0:
-                    try:
-                        c = self.ser.read()
-                    except serial.SerialException as e:
-                        logging.warning("SerialPort caught %s",str(e))
-                    else:
-                        self.rx_data_callback(c)
+                self.serialRun()
 
             elif self.attempt_connect:
                 self.attempt_connect = False
