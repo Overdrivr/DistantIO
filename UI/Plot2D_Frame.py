@@ -12,6 +12,7 @@ import tkinter.ttk as ttk
 import numpy as np
 from collections import deque
 import time as time
+import timeit
 
 """
 2D Plot GUI Frame
@@ -30,21 +31,6 @@ class Plot2D_Frame(Tk.Frame):
         self.x = deque(maxlen=128)
         self.y = deque(maxlen=128)
 
-        # Widgets
-        #self.grid(row=0,column=0,sticky="WENS")
-
-        #
-        #self.bouton_add_var = Tk.Button(self, text="PLOT SELECTION", command = self.add_var_to_plot)
-        #self.bouton_add_var.grid(column=0,row=2,rowspan=2,pady=3,padx=3,sticky='NSEW')
-
-        #
-        #self.bouton_switch_mode = Tk.Button(self, text="REMOVE VAR", command = self.remove_var_from_plot)
-        #self.bouton_switch_mode.grid(column=2,row=3,pady=3,padx=3)
-
-        #
-        #self.bouton_Clear = Tk.Button(self, text="Clear", command = self.clear_plot)
-        #self.bouton_Clear.grid(column=3,row=3,pady=3,padx=3)
-
         #
         self.f = Figure(figsize=(5,4), dpi=100)
         self.a = self.f.add_subplot(111)
@@ -62,36 +48,29 @@ class Plot2D_Frame(Tk.Frame):
         self.toolbar = NavigationToolbar2TkAgg(self.dataPlot, self.plotFrame)
         self.plotFrame.grid(row=1,column=0,columnspan=5,sticky="WENS")
 
-        self.start_time = time.time()
+        self.start_time = timeit.default_timer()
 
-        #
-        """
-        self.selected_var_name = Tk.StringVar()
-        self.selected_var_name.set("No variable")
-        self.selected_var = Tk.Label(self,textvariable=self.selected_var_name,bd=2,relief=Tk.GROOVE)
-        self.selected_var.grid(column=2,row=2,sticky='EW',pady=3,padx=3)
-        #
-        self.selected_value = Tk.DoubleVar()
-        self.selected_value.set(0.0)
-        self.selected_var_val = Tk.Label(self,textvariable=self.selected_value,bd=2,relief=Tk.GROOVE)
-        self.selected_var_val.grid(column=3,row=2,sticky='EW',pady=3,padx=3)
-        """
-
+        self.refresh_last_time = timeit.default_timer()
+        self.refresh_rate = 0.1 # Redraw every hundred millisecond
 
     def on_value_received(self,var_id,var_type,var_value,**kwargs):
         if not self.plotted_varid == var_id:
             return
 
+        t = timeit.default_timer()
 
         #self.x.appendleft(var_values)
         self.y.append(var_value)
-        self.x.append(time.time()-self.start_time)
+        self.x.append(t - self.start_time)
 
-        self.a.set_xlim([self.x[0],self.x[-1]])
-        self.line1.set_data(self.x,self.y)
-        self.a.relim()
-        self.a.autoscale_view(False,False,True)
-        self.dataPlot.draw()
+        if t - self.refresh_last_time > self.refresh_rate:
+            self.refresh_last_time = t
+
+            self.a.set_xlim([self.x[0],self.x[-1]])
+            self.line1.set_data(self.x,self.y)
+            self.a.relim()
+            self.a.autoscale_view(False,False,True)
+            self.dataPlot.draw()
 
 if __name__=="__main__":
     root = Tk.Tk()
