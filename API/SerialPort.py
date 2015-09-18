@@ -6,19 +6,7 @@ import serial
 from queue import Queue
 from serial.tools.list_ports import comports
 import logging
-from functools import wraps
-from time import time
-
-def timed(f):
-  @wraps(f)
-  def wrapper(*args, **kwds):
-    start = time()
-    result = f(*args, **kwds)
-    elapsed = time() - start
-    if elapsed > 0.016:
-        print("took "+str(elapsed))
-    return result
-  return wrapper
+from .TimingUtils import timeit
 
 #Serial data processing class
 class SerialPort(Thread):
@@ -81,7 +69,6 @@ class SerialPort(Thread):
     def stop(self):
         self.running = False
 
-    @timed
     def serialRun(self):
         inwaiting = 0
         try:
