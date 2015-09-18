@@ -12,8 +12,11 @@ from logging.handlers import RotatingFileHandler
 import binascii
 import multiprocessing as mp
 import time
+from collections import deque
+from .TimingUtils import timeit
 
 class Model():
+    @timeit
     def __init__(self):
         # Init logging facility
         # From : http://sametmax.com/ecrire-des-logs-en-python/
@@ -56,9 +59,12 @@ class Model():
         self.worker.start()
 
         # Threaded function for decoding received frames
-        self.condition_stop_thread = threading.Event()
+        self.frame_decoding_thread_running = True
         self.frame_decoding_thread = threading.Thread(target=self.process_output_queue)
         self.frame_decoding_thread.start()
+
+        # And finally the deque containing the instructions consumed by self.update
+        self.instructions = deque()
 
         # Timer for monitoring MCU alive
         self.mcu_died_delay = 2.0
@@ -83,21 +89,26 @@ class Model():
         if self.mcu_alive_timer.isAlive():
             self.mcu_alive_timer.join()
         self.connected = False
+        logging.info('Disconnected successfully.')
 
     def finish(self):
         self.disconnect()
         self.serial.stop()
-        self.serial.join()
-        logging.info('Serial thread joined.')
-        print("Notifying")
+        logging.info('Sending terminate signal to all threads.')
         self.condition_new_rx_data.set()
         self.condition_run_process.set()
-        print("Notified")
+        self.frame_decoding_thread_running = False
+        logging.info('Active thread count :'+str(threading.active_count()))
+        self.serial.join()
+        logging.info('Serial thread joined.')
+        logging.info('Active thread count :'+str(threading.active_count()))
         self.worker.join()
-        print("Joined. Notifying thread")
-        self.condition_stop_thread.set()
-        print("Notified thread.")
+        logging.info("Worker process joined.")
         self.frame_decoding_thread.join()
+        logging.info("Decoding thread joined.")
+        logging.info('Active thread count :'+str(threading.active_count()))
+        for t in threading.enumerate():
+            logging.info('Thread :'+str(t))
         logging.info('API terminated successfully.')
 
     def get_ports(self):
@@ -138,16 +149,10 @@ class Model():
             self.serial.write(frame)
 
     def process_output_queue(self):
-        while not self.condition_stop_thread.is_set():
+        while self.frame_decoding_thread_running:
             if not self.output_queue.empty():
                 frame = self.output_queue.get()
                 self.decode_frame(frame)
-    ## Callbacks
-        # RX : serial to protocol
-    def on_rx_data_callback(self,data):
-        #self.protocol.decode(c)
-        self.input_queue.put(data)
-        self.condition_new_rx_data.set()
 
         # RX : protocol to distantio
     def decode_frame(self,frame):
@@ -159,42 +164,56 @@ class Model():
         except ValueError as e:
             logging.warning("received error "+str(e)+" with frame : %s",binascii.hexlify(frame))
             return
-
-        # If distantio received a alive signal
-        if instruction['type'] == "alive-signal":
-            # Restart the timer
-            self.mcu_alive_timer.cancel()
-            self.mcu_alive_timer.join()
-
-            self.mcu_alive_timer = threading.Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
-
-            self.mcu_alive_timer.start()
-            self.signal_MCU_state_changed.emit(alive=True)
-
-        # if returned-value
-        elif instruction['type'] == 'returned-value':
-            self.signal_received_value.emit(var_id=instruction['var-id'],
-                                            var_type=instruction['var-type'],
-                                            var_value=instruction['var-value'])
-        # if returned-descriptor
-        elif instruction['type'] == 'returned-descriptor':
-            if not instruction['var-id'] in self.variable_list:
-                self.variable_list[instruction['var-id']] = dict()
-                self.variable_list[instruction['var-id']]['type'] = instruction['var-type']
-                self.variable_list[instruction['var-id']]['name'] = ['var-name']
-                self.variable_list[instruction['var-id']]['writeable'] = ['var-writeable']
-
-            self.signal_received_descriptor.emit(var_id=instruction['var-id'],
-                                                 var_type=instruction['var-type'],
-                                                 var_name=instruction['var-name'],
-                                                 var_writeable=instruction['var-writeable'],
-                                                 group_id=instruction['var-group'])
-        elif instruction['type'] == 'returned-group-descriptor':
-            self.signal_received_group_descriptor.emit(group_id=instruction['group-id'],
-                                                       group_name=instruction['group-name'])
         else:
-            logging.error("Unknown instruction :"+str(instruction))
+            self.instructions.append(instruction)
 
+    def update(self,maxamount=128):
+        count = 0
+        while len(self.instructions) > 0 and count < maxamount:
+            count += 1
+            instruction = self.instructions.popleft()
+            ### NOTE : THESE OPERATIONS SHOULD NOT BE PERFORMED ON A THREAD BUT ON THE MAIN THREAD
+            # If distantio received a alive signal
+            if instruction['type'] == "alive-signal":
+                # Restart the timer
+                self.mcu_alive_timer.cancel()
+                self.mcu_alive_timer.join()
+
+                self.mcu_alive_timer = threading.Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
+
+                self.mcu_alive_timer.start()
+                self.signal_MCU_state_changed.emit(alive=True)
+
+            # if returned-value
+            elif instruction['type'] == 'returned-value':
+                self.signal_received_value.emit(var_id=instruction['var-id'],
+                                                var_type=instruction['var-type'],
+                                                var_value=instruction['var-value'])
+            # if returned-descriptor
+            elif instruction['type'] == 'returned-descriptor':
+                if not instruction['var-id'] in self.variable_list:
+                    self.variable_list[instruction['var-id']] = dict()
+                    self.variable_list[instruction['var-id']]['type'] = instruction['var-type']
+                    self.variable_list[instruction['var-id']]['name'] = ['var-name']
+                    self.variable_list[instruction['var-id']]['writeable'] = ['var-writeable']
+
+                self.signal_received_descriptor.emit(var_id=instruction['var-id'],
+                                                     var_type=instruction['var-type'],
+                                                     var_name=instruction['var-name'],
+                                                     var_writeable=instruction['var-writeable'],
+                                                     group_id=instruction['var-group'])
+            elif instruction['type'] == 'returned-group-descriptor':
+                self.signal_received_group_descriptor.emit(group_id=instruction['group-id'],
+                                                           group_name=instruction['group-name'])
+            else:
+                logging.error("Unknown instruction :"+str(instruction))
+
+    ## Callbacks
+        # RX : serial to protocol
+    def on_rx_data_callback(self,data):
+        #self.protocol.decode(c)
+        self.input_queue.put(data)
+        #self.condition_new_rx_data.set()
 
     def on_mcu_lost_connection(self):
         self.signal_MCU_state_changed.emit(alive=False)

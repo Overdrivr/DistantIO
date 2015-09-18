@@ -14,12 +14,10 @@ class Worker(multiprocessing.Process):
         print("started")
         while not self.stop_condition.is_set():
             # Wait for new data to be put in the queue
-            self.wait_condition.wait()
-            while not self.input_queue.empty():
+            if not self.input_queue.empty() :
                 data = self.input_queue.get()
                 for c in list(memoryview(data)):
                     self.protocol.decode(c)
-            self.wait_condition.clear()
 
         print("stopped")
 
