@@ -172,7 +172,7 @@ class Model():
         while len(self.instructions) > 0 and count < maxamount:
             count += 1
             instruction = self.instructions.popleft()
-            ### NOTE : THESE OPERATIONS SHOULD NOT BE PERFORMED ON A THREAD BUT ON THE MAIN THREAD
+
             # If distantio received a alive signal
             if instruction['type'] == "alive-signal":
                 # Restart the timer
@@ -207,6 +207,9 @@ class Model():
                                                            group_name=instruction['group-name'])
             else:
                 logging.error("Unknown instruction :"+str(instruction))
+
+        if count == maxamount:
+            logging.warning("Instruction queue not processed fast enough. Current size :"+str(len(self.Instructions)))
 
     ## Callbacks
         # RX : serial to protocol
