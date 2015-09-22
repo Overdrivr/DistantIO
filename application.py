@@ -45,7 +45,6 @@ class Application(ttk.Frame):
     def stop(self):
         self.model.finish()
 
-    @timeit
     def update(self):
         # Decode 100 instructions max
         self.model.update(10)
