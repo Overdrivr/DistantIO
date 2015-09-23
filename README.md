@@ -80,8 +80,18 @@ python application.py
 
 You will most likely have import errors from the API. If this is the case, add the DistantIO **parent** folder to the PYTHONPATH.
 
-If your folder is for instance in C:/Documents/GitHub/DistantIO, add C:/Documents/Github to PYTHONPATH.
+If your folder is for instance in
 
+```
+C:/Documents/GitHub/DistantIO
+```
+
+You need to add
+
+```
+C:/Documents/Github
+```
+to PYTHONPATH
 *Note : If you have spaces in your pathname, don't forget to use "".*
 
 For instance with C:/Program Files/GitHub/DistantIO add C:/"Program Files"/Github to PYTHONPATH
@@ -89,17 +99,17 @@ For instance with C:/Program Files/GitHub/DistantIO add C:/"Program Files"/Githu
 ## Running tests
 For now, both protocols in the API can be automatically tested using pytest.
 You can run the following commands in a console pointing to DistantIO/ to run the tests
-'''bash
+```bash
 py.test -v
-'''
+```
 
 This will have a verbose (-v) output. It will tell you which individual test passed or failed.
 
 Coverage results can additionally be obtained using pytest-cov using the --cov flag
 
-'''bash
+```bash
 py.test --cov --cov-report html -v
-'''
+```
 
 It will also generate a coverage report in html format that you can find in the generated htmlcov/ folder.
 Open index.html in a browser to see the coverage results.
