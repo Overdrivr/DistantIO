@@ -12,8 +12,8 @@ from logging.handlers import RotatingFileHandler
 import binascii
 import multiprocessing as mp
 import time
-from collections import deque
 from .TimingUtils import timeit
+from DistantIO.API.Utils import ValuesXY
 
 class Model():
     @timeit
@@ -39,7 +39,7 @@ class Model():
         self.signal_MCU_state_changed = Signal(args=['alive'])
         self.signal_received_descriptor = Signal(args=['var_id','var_type','var_name','var_writeable','group_id'])
         self.signal_received_group_descriptor = Signal(args=['group_id','group_name'])
-        self.signal_received_value = Signal(args=['var_id','var_type','var_value'])
+        self.signal_received_value = Signal(args=['var_id'])
 
         self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
         self.distantio = distantio_protocol()
@@ -58,13 +58,15 @@ class Model():
         self.worker = Worker(self.input_queue,self.output_queue,self.condition_new_rx_data,self.condition_run_process)
         self.worker.start()
 
-        # Threaded function for decoding received frames
-        self.frame_decoding_thread_running = True
-        self.frame_decoding_thread = threading.Thread(target=self.process_output_queue)
-        self.frame_decoding_thread.start()
-
-        # And finally the deque containing the instructions consumed by self.update
-        self.instructions = deque()
+        # Array containing buffers with MCU variables values
+        self.variables_values = dict()
+        # max size of the buffers
+        self.buffer_length = 128
+        # Array containing last time each individual variable was updated
+        self.last_variables_update = dict()
+        # Min delay in seconds between two emit value received signal
+        self.emit_signal_delay = 0.1
+        self.time_start = time.time()
 
         # Timer for monitoring MCU alive
         self.mcu_died_delay = 2.0
@@ -97,15 +99,15 @@ class Model():
         logging.info('Sending terminate signal to all threads.')
         self.condition_new_rx_data.set()
         self.condition_run_process.set()
-        self.frame_decoding_thread_running = False
+        #self.frame_decoding_thread_running = False
         logging.info('Active thread count :'+str(threading.active_count()))
         self.serial.join()
         logging.info('Serial thread joined.')
         logging.info('Active thread count :'+str(threading.active_count()))
         self.worker.join()
         logging.info("Worker process joined.")
-        self.frame_decoding_thread.join()
-        logging.info("Decoding thread joined.")
+        #self.frame_decoding_thread.join()
+        #logging.info("Decoding thread joined.")
         logging.info('Active thread count :'+str(threading.active_count()))
         for t in threading.enumerate():
             logging.info('Thread :'+str(t))
@@ -148,30 +150,12 @@ class Model():
             frame = self.protocol.encode(frame)
             self.serial.write(frame)
 
-    def process_output_queue(self):
-        while self.frame_decoding_thread_running:
-            if not self.output_queue.empty():
-                frame = self.output_queue.get()
-                self.decode_frame(frame)
-
-        # RX : protocol to distantio
-    def decode_frame(self,frame):
-        try:
-            instruction = self.distantio.process(frame)
-        except IndexError as e:
-            logging.warning("received error "+str(e)+" with frame : %s",binascii.hexlify(frame))
-            return
-        except ValueError as e:
-            logging.warning("received error "+str(e)+" with frame : %s",binascii.hexlify(frame))
-            return
-        else:
-            self.instructions.append(instruction)
-
+    # TODO : Monitor execution time of this function
     def update(self,maxamount=128):
         count = 0
-        while len(self.instructions) > 0 and count < maxamount:
+        while not self.output_queue.empty() and count < maxamount:
             count += 1
-            instruction = self.instructions.popleft()
+            instruction = self.output_queue.get()
 
             # If distantio received a alive signal
             if instruction['type'] == "alive-signal":
@@ -186,37 +170,58 @@ class Model():
 
             # if returned-value
             elif instruction['type'] == 'returned-value':
-                self.signal_received_value.emit(var_id=instruction['var-id'],
-                                                var_type=instruction['var-type'],
-                                                var_value=instruction['var-value'])
+
+                # Check var id is known, otherwise create a buffer for it
+                if not instruction['var-id'] in self.variables_values:
+                    self.variables_values[instruction['var-id']] = ValuesXY(self.buffer_length)
+
+                # Store value and time in sbuffer
+                self.variables_values[instruction['var-id']].append(time.time() - self.time_start,instruction['var-value'])
+
+                if not instruction['var-id'] in self.last_variables_update:
+                    self.last_variables_update[instruction['var-id']] = 0
+
+                current_time = time.time()
+                elapsed_time = current_time - self.last_variables_update[instruction['var-id']]
+
+                # Make sure the received-value signal was not emitted too ofter
+                if elapsed_time > self.emit_signal_delay:
+                    self.last_variables_update[instruction['var-id']] = current_time
+                    self.signal_received_value.emit(var_id=instruction['var-id'])
+
             # if returned-descriptor
             elif instruction['type'] == 'returned-descriptor':
-                if not instruction['var-id'] in self.variable_list:
-                    self.variable_list[instruction['var-id']] = dict()
-                    self.variable_list[instruction['var-id']]['type'] = instruction['var-type']
-                    self.variable_list[instruction['var-id']]['name'] = ['var-name']
-                    self.variable_list[instruction['var-id']]['writeable'] = ['var-writeable']
+
+                self.variable_list[instruction['var-id']] = dict()
+                self.variable_list[instruction['var-id']]['type'] = instruction['var-type']
+                self.variable_list[instruction['var-id']]['name'] = ['var-name']
+                self.variable_list[instruction['var-id']]['writeable'] = ['var-writeable']
+
+                if not instruction['var-id'] in self.variables_values:
+                    self.variables_values[instruction['var-id']] = ValuesXY(self.buffer_length)
+
+                if not instruction['var-id'] in self.last_variables_update:
+                    self.last_variables_update[instruction['var-id']] = 0
 
                 self.signal_received_descriptor.emit(var_id=instruction['var-id'],
                                                      var_type=instruction['var-type'],
                                                      var_name=instruction['var-name'],
                                                      var_writeable=instruction['var-writeable'],
                                                      group_id=instruction['var-group'])
+
             elif instruction['type'] == 'returned-group-descriptor':
                 self.signal_received_group_descriptor.emit(group_id=instruction['group-id'],
                                                            group_name=instruction['group-name'])
             else:
                 logging.error("Unknown instruction :"+str(instruction))
 
-        if count == maxamount:
-            logging.warning("Instruction queue not processed fast enough. Current size :"+str(len(self.Instructions)))
+        if count == maxamount and self.output_queue.qsize() > 200:
+            logging.warning("Instruction queue not processed fast enough. Current size :"+str(self.output_queue.qsize()))
 
     ## Callbacks
         # RX : serial to protocol
     def on_rx_data_callback(self,data):
-        #self.protocol.decode(c)
         self.input_queue.put(data)
-        #self.condition_new_rx_data.set()
 
     def on_mcu_lost_connection(self):
         self.signal_MCU_state_changed.emit(alive=False)
@@ -234,3 +239,16 @@ class Model():
 
     def unused(self,frame):
         logging.error("Local protocol decoded frame "+str(frame)+" instead of Worker")
+
+    # Getters setters
+    def get_last_value(self, var_id):
+        if not var_id in self.variables_values:
+            raise IndexError("Variable ID "+str(instruction['var-id'])+" not found.")
+        else:
+            return self.variables_values[var_id].y[-1]
+
+    def get_buffers_value(self,var_id):
+        if not var_id in self.variables_values:
+            raise IndexError("Variable ID "+str(instruction['var-id'])+" not found.")
+        else:
+            return self.variables_values[var_id]
