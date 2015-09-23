@@ -41,5 +41,4 @@ class SerialHealth_Frame(ttk.LabelFrame):
     def refresh(self):
         self.queue1_size.set(self.model.input_queue.qsize())
         self.queue2_size.set(self.model.output_queue.qsize())
-        self.queue3_size.set(len(self.model.instructions))
         self.root.after(300,self.refresh)

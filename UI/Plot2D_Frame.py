@@ -13,15 +13,17 @@ import numpy as np
 from collections import deque
 import time as time
 import timeit
+from DistantIO.API.Utils import ValuesXY
 
 """
 2D Plot GUI Frame
 """
 class Plot2D_Frame(Tk.Frame):
-    def __init__(self,parent,var_id,**kwargs):
+    def __init__(self,parent,model,var_id,**kwargs):
         Tk.Frame.__init__(self,parent,**kwargs)
         self.plotmode = 'scalar'
         self.plotted_varid = var_id
+        self.model = model
 
         self.ymin = None
         self.ymax = None
@@ -53,21 +55,17 @@ class Plot2D_Frame(Tk.Frame):
         self.refresh_last_time = timeit.default_timer()
         self.refresh_rate = 0.1 # Redraw every hundred millisecond
 
-    def on_value_received(self,var_id,var_type,var_value,**kwargs):
+    def on_value_received(self,var_id,**kwargs):
         if not self.plotted_varid == var_id:
             return
 
         t = timeit.default_timer()
 
-        #self.x.appendleft(var_values)
-        self.y.append(var_value)
-        self.x.append(t - self.start_time)
-
         if t - self.refresh_last_time > self.refresh_rate:
             self.refresh_last_time = t
-
-            self.a.set_xlim([self.x[0],self.x[-1]])
-            self.line1.set_data(self.x,self.y)
+            self.data = self.model.get_buffers_value(self.plotted_varid)
+            self.a.set_xlim([self.data.x[0],self.data.x[-1]])
+            self.line1.set_data(self.data.x,self.data.y)
             self.a.relim()
             self.a.autoscale_view(False,False,True)
             self.dataPlot.draw()

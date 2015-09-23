@@ -5,6 +5,7 @@ import tkinter as Tk
 import tkinter.ttk as ttk
 from DistantIO.UI.Plot2D_Frame import Plot2D_Frame
 import logging
+from DistantIO.API.Utils import ValuesXY
 
 class VariableTable_Frame(ttk.LabelFrame):
     def __init__(self,parent,model,**kwargs):
@@ -174,10 +175,10 @@ class VariableTable_Frame(ttk.LabelFrame):
             self.var_list.item(created_id,text=group_name)
 
 
-    def on_value_received(self,var_id,var_type,var_value,**kwargs):
+    def on_value_received(self,var_id,**kwargs):
         if var_id in self.variables:
             i = self.variables[var_id]['index']
-            self.var_list.set(i,'value',var_value)
+            self.var_list.set(i,'value',self.model.get_last_value(var_id))
 
 
     def on_checkbutton_changed(self):
@@ -227,7 +228,7 @@ class VariableTable_Frame(ttk.LabelFrame):
             return
 
         top = Tk.Toplevel()
-        plot = Plot2D_Frame(top,self.selected_var_id)
+        plot = Plot2D_Frame(top,self.model,self.selected_var_id)
         plot.pack()
         self.model.signal_received_value.connect(plot.on_value_received)
         self.plots.append(plot)
