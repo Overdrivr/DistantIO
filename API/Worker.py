@@ -1,5 +1,8 @@
 import multiprocessing
 from .Protocol import Protocol
+from .distantio_protocol import distantio_protocol
+import logging
+import binascii
 
 class Worker(multiprocessing.Process):
     def __init__(self,input_queue,output_queue,new_data_condition,stop_condition):
@@ -9,6 +12,7 @@ class Worker(multiprocessing.Process):
         self.wait_condition = new_data_condition
         self.stop_condition = stop_condition
         self.protocol = Protocol(self.on_frame_decoded_callback)
+        self.decoder = distantio_protocol()
 
     def run(self):
         print("started")
@@ -22,4 +26,13 @@ class Worker(multiprocessing.Process):
         print("stopped")
 
     def on_frame_decoded_callback(self,frame):
-        self.output_queue.put(frame)
+        try:
+            instruction = self.decoder.process(frame)
+        except IndexError as e:
+            logging.warning("received error "+str(e)+" with frame : %s",binascii.hexlify(frame))
+            return
+        except ValueError as e:
+            logging.warning("received error "+str(e)+" with frame : %s",binascii.hexlify(frame))
+            return
+        else:
+            self.output_queue.put(instruction)
