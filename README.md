@@ -5,7 +5,7 @@ Master can be for instance a computer and the slave an embedded device such as a
 The whole program was designed to be simple to use.
 
 On the slave side, only three steps are required.
-Simply register variables during initialization time, feed the incoming characters to the API, update it regularly and you're good to go.
+Simply register variables during initialization time, feed the incoming communication data to the API, update it regularly and you're good to go.
 
 Master side, the user interface provided can be used as is, for reading/writing/plotting MCU variables.
 Or you can ditch it entirely and develop your own user interface with the API. ;)
@@ -40,18 +40,8 @@ Supported Boards:
 * And any other board programmed in C language.
 
 #### ARM mbed
-The C implementation is also in the process of being released as a library on the ARM mbed platform (<https://developer.mbed.org/>).
-This would mean the library will be supported by any MCU running on an ARM processor.
-
-## Protocols
-Two different protocols are used in distantio.
-Serial frames are delimited using flags with a classic byte-stuffing algorithm.
-Frames are fixed-size, because this reduces at lot the constraints on the slave code.
-
-The second protocol is the core of distantio and defines what is contained in a delimited frame.
-Each frames carries a 16 bits CRC (Cyclic Redundancy Check) to ensure the received value was not corrupted during transport or processing.
-
-Protocols are defined in serial_protocols_definition.xlsx
+The C implementation is available on ARM mbed development platform(<https://developer.mbed.org/users/Overdrivr/code/DistantIO/>).
+This increases considerably the amount of supported hardware platform. See the full list on <https://developer.mbed.org/platforms/>
 
 ## Python installation requirements
 ### Core version
@@ -113,6 +103,16 @@ py.test --cov --cov-report html -v
 
 It will also generate a coverage report in html format that you can find in the generated htmlcov/ folder.
 Open index.html in a browser to see the coverage results.
+
+## Protocols
+Two different protocols are used in distantio.
+Serial frames are delimited using flags with a classic byte-stuffing algorithm.
+Frames are fixed-size, because this reduces at lot the constraints on the slave code.
+
+The second protocol is the core of distantio and defines what is contained in a delimited frame.
+Each frames carries a 16 bits CRC (Cyclic Redundancy Check) to ensure the received value was not corrupted during transport or processing.
+
+Protocols are defined in serial_protocols_definition.xlsx
 
 ## Furure work for slave-side
 * C++ implementation
