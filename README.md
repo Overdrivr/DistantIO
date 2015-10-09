@@ -11,11 +11,13 @@ Master side, the user interface provided can be used as is, for reading/writing/
 Or you can ditch it entirely and develop your own user interface with the API. ;)
 
 ## Authors
-* Rémi Bèges (python API + GUI)
-* Jerôme Mallet (GUI improvements)
-* Dan Faudemer (API improvements)
+* Rémi Bèges
+* Jerôme Mallet (UI improvements)
+* Dan Faudemer (python API improvements)
 
 ## Contents of this repository
+TODO : rewrite, speak about features.
+
 ### Master-side User Interface
 The User Interface is made with Tkinter/ttk.
 It is supplied for communicating with the MCU in a more friendly manner.
@@ -51,6 +53,7 @@ If you have an older python version and wish to keep both, have a look at the vi
 This module will enable you to switch between python versions/installations with a simple console command.
 
 ### Modules to install (manually or via pip)
+TODO : Use virtualenv requirements system for installing modules. But install numpy first from precompiled sources
 * pyserial
 * tkinter (optionnal, for running the UI)
 * pyttk (optionnal, for running the UI)
