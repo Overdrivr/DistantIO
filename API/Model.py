@@ -2,8 +2,8 @@
 # For conditions of distribution and use, see copyright notice in the LICENSE file
 
 from .SerialPort import SerialPort
-from .distantio_protocol import distantio_protocol
-from .Protocol import Protocol
+from .DistantioProtocol import distantio_protocol
+from .FrameProtocol import Protocol
 from .Worker import Worker
 from signalslot import Signal
 import threading
@@ -14,6 +14,8 @@ import multiprocessing as mp
 import time
 from .TimingUtils import timeit
 from DistantIO.API.Utils import ValuesXY
+import os
+import csv
 
 class Model():
     @timeit
@@ -75,6 +77,9 @@ class Model():
         self.variable_list = dict()
         self.connected = False
 
+        # Storage for emergency data
+        self.emergency_data = dict()
+
         logging.info('DistantIO API initialized successfully.')
 
     def connect(self,port,baudrate=115200):
@@ -92,6 +97,9 @@ class Model():
             self.mcu_alive_timer.join()
         self.connected = False
         logging.info('Disconnected successfully.')
+
+        # Write emergency data to file
+        self.write_emergency_data_to_xcel('1.xls')
 
     def finish(self):
         self.disconnect()
@@ -138,7 +146,7 @@ class Model():
             return
 
         logging.info('requested MCU to write '+str(data)+' to var id '+str(variable_id)+'.')
-        frame = self.distantio.get_write_variable_frame(variable_id,self.variable_list[variable_id]['type'],data)
+        frame = self.distantio.get_write_value_frame(variable_id,self.variable_list[variable_id]['type'],data)
         frame = self.protocol.encode(frame)
         self.serial.write(frame)
 
@@ -146,7 +154,7 @@ class Model():
     def request_read_all(self):
         for key in self.variable_list:
             logging.info('requested to receive readings of var id '+str(key)+'.')
-            frame = self.distantio.get_start_readings_frame(key,self.variable_list[key]['type'])
+            frame = self.distantio.get_start_reading_frame(key,self.variable_list[key]['type'])
             frame = self.protocol.encode(frame)
             self.serial.write(frame)
 
@@ -176,7 +184,7 @@ class Model():
                     self.variables_values[instruction['var-id']] = ValuesXY(self.buffer_length)
 
                 # Store value and time in sbuffer
-                self.variables_values[instruction['var-id']].append(time.time() - self.time_start,instruction['var-value'])
+                self.variables_values[instruction['var-id']].append(instruction['var-time'],instruction['var-value'])
 
                 if not instruction['var-id'] in self.last_variables_update:
                     self.last_variables_update[instruction['var-id']] = 0
@@ -212,6 +220,20 @@ class Model():
             elif instruction['type'] == 'returned-group-descriptor':
                 self.signal_received_group_descriptor.emit(group_id=instruction['group-id'],
                                                            group_name=instruction['group-name'])
+
+            elif instruction['type'] == 'emergency-send':
+                dataid =  instruction['data-id']
+                logging.warning("Received emergency data with user id /"+str(dataid)+"\\")
+
+                # Create table if not existing
+                if not dataid in self.emergency_data:
+                    self.emergency_data[dataid] = list()
+
+                self.emergency_data[dataid].append((instruction['data-time'],
+                                                    instruction['data-index'],
+                                                    instruction['data-value']))
+
+
             else:
                 logging.error("Unknown instruction :"+str(instruction))
 
@@ -252,3 +274,22 @@ class Model():
             raise IndexError("Variable ID "+str(instruction['var-id'])+" not found.")
         else:
             return self.variables_values[var_id]
+
+    def write_emergency_data_to_csv(self,filename):
+        #if not self.emergency_data:
+        #    return
+
+        # Create subfolder in log
+        basefolder = r'Log/'
+        if not os.path.exists(basefolder):
+            os.mkdir(basefolder)
+
+        subfolder = basefolder + r'/' + time.strftime("%Y_%m_%d_%H-%M-%S/")
+        print(subfolder)
+        if not os.path.exists(subfolder):
+            os.mkdir(subfolder)
+
+        filepath = subfolder + r'/' + filename
+
+        #for data in self.emergency_data:
+        #    file =
