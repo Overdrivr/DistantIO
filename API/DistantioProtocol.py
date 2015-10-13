@@ -141,8 +141,8 @@ class distantio_protocol():
             returned_instruction['type'] = 'returned-value'
 
             # Check format is valid
-            raw_format = frame[3] & 0x0F
-            if raw_format < 0 or raw_format > 6:
+            raw_format = frame[self.data_type_start] & 0x0F
+            if raw_format < 0 or raw_format > 6:# TODO : Change with format lookup
                 raise ValueError("Received format identifier "+str(frame)+" unknown.")
 
             value = unpack('>H',(frame[self.data_id_start:self.data_id_end]))[0]
@@ -157,6 +157,21 @@ class distantio_protocol():
         # alive-signal command
         if cmd == 0x03:
             returned_instruction['type'] = 'alive-signal'
+            return returned_instruction
+
+        # Emergency send
+        if cmd == 0x09:
+            returned_instruction['type'] = 'emergency-send'
+            returned_instruction['data-id'] = frame[self.data_id_start:self.data_id_end].decode(encoding='UTF-8')
+            # Check format is valid
+            raw_format = frame[self.data_type_start] & 0x0F
+            if raw_format < 0 or raw_format > 6:# TODO : Change with format lookup
+                raise ValueError("Received format identifier "+str(frame)+" unknown.")
+
+            returned_instruction['data-type'] = raw_format
+            returned_instruction['data-time'] = unpack('>f',frame[self.extraid_1_start:self.extraid_1_end])[0]
+            returned_instruction['data-index'] = unpack('>H',frame[self.extraid_2_start:self.extraid_2_end])[0]
+            returned_instruction['data-value'] = unpack(self.format_lookup[raw_format],frame[self.data_start:self.data_end])[0]
             return returned_instruction
 
         raise ValueError("Received command "+str(cmd)+" unknown.")
