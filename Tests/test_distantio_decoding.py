@@ -3,7 +3,7 @@
 
 # See __init__.py file on how to run tests automatically
 
-from DistantIO.API.distantio_protocol import distantio_protocol
+from DistantIO.API.DistantioProtocol import distantio_protocol
 from DistantIO.API.crc import crc16
 from struct import pack,unpack
 import pytest

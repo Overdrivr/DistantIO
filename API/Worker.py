@@ -1,6 +1,6 @@
 import multiprocessing
-from .Protocol import Protocol
-from .distantio_protocol import distantio_protocol
+from .FrameProtocol import Protocol
+from .DistantioProtocol import distantio_protocol
 import logging
 import binascii
 
