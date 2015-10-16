@@ -5,20 +5,19 @@ from .SerialPort import SerialPort
 from .DistantioProtocol import distantio_protocol
 from .FrameProtocol import Protocol
 from .Worker import Worker
+from .Datalogger import Datalogger
 from signalslot import Signal
 import threading
 import logging
 from logging.handlers import RotatingFileHandler
 import binascii
-import multiprocessing as mp
 import time
+import multiprocessing as mp
 from .TimingUtils import timeit
 from DistantIO.API.Utils import ValuesXY
-import os
-import csv
+
 
 class Model():
-    @timeit
     def __init__(self):
         # Init logging facility
         # From : http://sametmax.com/ecrire-des-logs-en-python/
@@ -77,8 +76,7 @@ class Model():
         self.variable_list = dict()
         self.connected = False
 
-        # Storage for emergency data
-        self.emergency_data = dict()
+        self.datalogger = Datalogger()
 
         logging.info('DistantIO API initialized successfully.')
 
@@ -99,7 +97,7 @@ class Model():
         logging.info('Disconnected successfully.')
 
         # Write emergency data to file
-        self.write_emergency_data_to_xcel('1.xls')
+        self.datalogger.export()
 
     def finish(self):
         self.disconnect()
@@ -222,17 +220,9 @@ class Model():
                                                            group_name=instruction['group-name'])
 
             elif instruction['type'] == 'emergency-send':
-                dataid =  instruction['data-id']
-                logging.warning("Received emergency data with user id /"+str(dataid)+"\\")
+                logging.warning("Received emergency data with user id "+str(instruction['data-id']))
 
-                # Create table if not existing
-                if not dataid in self.emergency_data:
-                    self.emergency_data[dataid] = list()
-
-                self.emergency_data[dataid].append((instruction['data-time'],
-                                                    instruction['data-index'],
-                                                    instruction['data-value']))
-
+                self.datalogger.append(instruction['data-id'],instruction['data-time'],instruction['data-index'],instruction['data-value'])
 
             else:
                 logging.error("Unknown instruction :"+str(instruction))
@@ -274,22 +264,3 @@ class Model():
             raise IndexError("Variable ID "+str(instruction['var-id'])+" not found.")
         else:
             return self.variables_values[var_id]
-
-    def write_emergency_data_to_csv(self,filename):
-        #if not self.emergency_data:
-        #    return
-
-        # Create subfolder in log
-        basefolder = r'Log/'
-        if not os.path.exists(basefolder):
-            os.mkdir(basefolder)
-
-        subfolder = basefolder + r'/' + time.strftime("%Y_%m_%d_%H-%M-%S/")
-        print(subfolder)
-        if not os.path.exists(subfolder):
-            os.mkdir(subfolder)
-
-        filepath = subfolder + r'/' + filename
-
-        #for data in self.emergency_data:
-        #    file =
