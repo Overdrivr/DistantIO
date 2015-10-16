@@ -220,6 +220,7 @@ pip-log.txt
 .coverage
 .tox
 htmlcov/
+Log/
 #Translations
 *.mo
 
