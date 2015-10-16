@@ -15,7 +15,7 @@ class Worker(multiprocessing.Process):
         self.decoder = distantio_protocol()
 
     def run(self):
-        print("started")
+        logging.info("Worker process started")
         while not self.stop_condition.is_set():
             # Wait for new data to be put in the queue
             if not self.input_queue.empty() :
@@ -23,7 +23,7 @@ class Worker(multiprocessing.Process):
                 for c in list(memoryview(data)):
                     self.protocol.decode(c)
 
-        print("stopped")
+        logging.info("Worker process stopped")
 
     def on_frame_decoded_callback(self,frame):
         try:

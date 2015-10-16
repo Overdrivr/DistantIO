@@ -12,7 +12,6 @@ from UI.VariableTable_Frame import VariableTable_Frame
 from UI.SerialHealth_Frame import SerialHealth_Frame
 
 class Application(ttk.Frame):
-    @timeit
     def __init__(self,parent,**kwargs):
         # Init
         self.root = parent
