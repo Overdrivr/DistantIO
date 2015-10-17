@@ -7,7 +7,7 @@ def timeit(f):
     start = time()
     result = f(*args, **kwds)
     elapsed = time() - start
-    if elapsed > 0.1:
+    if elapsed > 0.05:
         print(f.__name__+" took "+str(elapsed))
     return result
   return wrapper

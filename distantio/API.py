@@ -17,7 +17,7 @@ from .TimingUtils import timeit
 from DistantIO.API.Utils import ValuesXY
 
 
-class Model():
+class API():
     def __init__(self):
         # Init logging facility
         # From : http://sametmax.com/ecrire-des-logs-en-python/
