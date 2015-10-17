@@ -14,7 +14,8 @@ import binascii
 import time
 import multiprocessing as mp
 from .TimingUtils import timeit
-from DistantIO.API.Utils import ValuesXY
+import distantio
+from distantio.Utils import ValuesXY
 
 
 class DistantIO():

@@ -5,8 +5,8 @@
 import tkinter as Tk
 import tkinter.ttk as ttk
 
-from API.Model import Model
-from API.TimingUtils import timeit
+import distantio
+from distantio.TimingUtils import timeit
 from UI.COM_Frame import COM_Frame
 from UI.VariableTable_Frame import VariableTable_Frame
 from UI.SerialHealth_Frame import SerialHealth_Frame
@@ -24,7 +24,7 @@ class Application(ttk.Frame):
         self.grid(row=0,column=0,sticky="WENS")
 
         # Create Model
-        self.model = Model()
+        self.model = distantio.DistantIO()
 
         # Init COM port frame
         self.com_ports = COM_Frame(self,self.model,relief=Tk.GROOVE)

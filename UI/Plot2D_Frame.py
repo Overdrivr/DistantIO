@@ -13,7 +13,7 @@ import numpy as np
 from collections import deque
 import time as time
 import timeit
-from DistantIO.API.Utils import ValuesXY
+from distantio.Utils import ValuesXY
 
 """
 2D Plot GUI Frame

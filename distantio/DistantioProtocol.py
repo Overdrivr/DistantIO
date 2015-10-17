@@ -1,7 +1,7 @@
 # Copyright (C) 2014 Rémi Bèges
 # For conditions of distribution and use, see copyright notice in the LICENSE file
 
-from DistantIO.API.crc import crc16
+from distantio.crc import crc16
 from struct import pack,unpack
 import logging
 

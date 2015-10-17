@@ -5,7 +5,7 @@ import tkinter as Tk
 import tkinter.ttk as ttk
 from DistantIO.UI.Plot2D_Frame import Plot2D_Frame
 import logging
-from DistantIO.API.Utils import ValuesXY
+from distantio.Utils import ValuesXY
 
 class VariableTable_Frame(ttk.LabelFrame):
     def __init__(self,parent,model,**kwargs):
