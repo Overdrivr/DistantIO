@@ -1,7 +1,6 @@
 # Copyright (C) 2014 Rémi Bèges
 # For conditions of distribution and use, see copyright notice in the LICENSE file
 
-from .SerialPort import SerialPort
 from .DistantioProtocol import distantio_protocol
 from .FrameProtocol import Protocol
 from .Worker import Worker
@@ -35,15 +34,11 @@ class DistantIO():
         logger.addHandler(stream_handler)
 
         # Signals
-        self.signal_connected = Signal(args=['port'])
-        self.signal_disconnected = Signal()
-        self.signal_connecting = Signal()
         self.signal_MCU_state_changed = Signal(args=['alive'])
         self.signal_received_descriptor = Signal(args=['var_id','var_type','var_name','var_writeable','group_id'])
         self.signal_received_group_descriptor = Signal(args=['group_id','group_name'])
         self.signal_received_value = Signal(args=['var_id'])
 
-        self.serial = SerialPort(self.on_rx_data_callback,self.on_connection_attempt_callback)
         self.distantio = distantio_protocol()
         self.protocol = Protocol(self.unused)
 
@@ -79,49 +74,40 @@ class DistantIO():
 
         self.datalogger = Datalogger()
 
+        # Start MCU timer
+        self.mcu_alive_timer = threading.Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
+        self.mcu_alive_timer.start()
+
         logging.info('DistantIO API initialized successfully.')
 
-    def connect(self,port,baudrate=115200):
-        if not self.connected:
-            self.signal_connecting.emit()
-            self.serial.connect(port,baudrate)
-            self.mcu_alive_timer = threading.Timer(self.mcu_died_delay,self.on_mcu_lost_connection)
-            self.mcu_alive_timer.start()
+    def decode_rx_data(self,data):
+        self.input_queue.put(data)
 
-    def disconnect(self):
-        self.serial.disconnect()
+    def export_data(self):
+
         self.signal_MCU_state_changed.emit(alive=False)
-        self.mcu_alive_timer.cancel()
-        if self.mcu_alive_timer.isAlive():
-            self.mcu_alive_timer.join()
+
         self.connected = False
         logging.info('Disconnected successfully.')
 
         # Write emergency data to file
         self.datalogger.export()
 
-    def finish(self):
-        self.disconnect()
-        self.serial.stop()
+    def terminate(self):
+
+        self.mcu_alive_timer.cancel()
+        if self.mcu_alive_timer.isAlive():
+            self.mcu_alive_timer.join()
+
         logging.info('Sending terminate signal to all threads.')
         self.condition_new_rx_data.set()
         self.condition_run_process.set()
-        #self.frame_decoding_thread_running = False
-        logging.info('Active thread count :'+str(threading.active_count()))
-        self.serial.join()
-        logging.info('Serial thread joined.')
-        logging.info('Active thread count :'+str(threading.active_count()))
         self.worker.join()
         logging.info("Worker process joined.")
-        #self.frame_decoding_thread.join()
-        #logging.info("Decoding thread joined.")
         logging.info('Active thread count :'+str(threading.active_count()))
         for t in threading.enumerate():
             logging.info('Thread :'+str(t))
         logging.info('API terminated successfully.')
-
-    def get_ports(self):
-        return self.serial.get_ports()
 
     ### Distant IO calls to MCU
     # Ask the MCU to return all descriptors
@@ -129,7 +115,7 @@ class DistantIO():
         logging.info('requested all descriptors to MCU.')
         frame = self.distantio.get_descriptors_frame()
         frame = self.protocol.encode(frame)
-        self.serial.write(frame)
+        return frame
 
     # Ask the MCU to write a variable
     def request_write(self, variable_id, data):
@@ -147,7 +133,7 @@ class DistantIO():
         logging.info('requested MCU to write '+str(data)+' to var id '+str(variable_id)+'.')
         frame = self.distantio.get_write_value_frame(variable_id,self.variable_list[variable_id]['type'],data)
         frame = self.protocol.encode(frame)
-        self.serial.write(frame)
+        return frame
 
     # Ask the MCU to read all variables
     def request_read_all(self):
@@ -155,11 +141,12 @@ class DistantIO():
             logging.info('requested to receive readings of var id '+str(key)+'.')
             frame = self.distantio.get_start_reading_frame(key,self.variable_list[key]['type'])
             frame = self.protocol.encode(frame)
-            self.serial.write(frame)
+            yield frame
 
     # TODO : Monitor execution time of this function
     def update(self,maxamount=128):
         count = 0
+
         while not self.output_queue.empty() and count < maxamount:
             count += 1
             instruction = self.output_queue.get()
@@ -232,23 +219,8 @@ class DistantIO():
             logging.warning("Instruction queue not processed fast enough. Current size :"+str(self.output_queue.qsize()))
 
     ## Callbacks
-        # RX : serial to protocol
-    def on_rx_data_callback(self,data):
-        self.input_queue.put(data)
-
     def on_mcu_lost_connection(self):
         self.signal_MCU_state_changed.emit(alive=False)
-
-        # TX : distantio to serial
-    def on_tx_frame_callback(self,frame):
-        frame = self.protocol.encode(frame)
-        self.serial.write(frame)
-
-    def on_connection_attempt_callback(self,message):
-        if message in ["NO-PORT-FOUND","UNKNOWN-CONNECTION-ISSUE","CONNECTION-ISSUE","OTHER-PORTS-FOUND","DISCONNECTED"]:
-           self.signal_disconnected.emit()
-        else:
-           self.signal_connected.emit(port=message)
 
     def unused(self,frame):
         logging.error("Local protocol decoded frame "+str(frame)+" instead of Worker")

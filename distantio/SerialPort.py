@@ -10,49 +10,23 @@ from .TimingUtils import timeit
 
 #Serial data processing class
 class SerialPort(Thread):
-    def __init__(self,on_rx_data_callback,connection_attempt_callback):
+    def __init__(self,on_rx_data_callback):
         Thread.__init__(self)
         self.ser = serial.Serial()
 
         self.rx_data_callback = on_rx_data_callback
-        self.connection_attempt_callback = connection_attempt_callback
-        self.connection_attempt_callback("DISCONNECTED")
-
-        # Starting thread
-        self.running = True
-        self.attempt_connect = False
-        self.start()
 
         self.threshold = 100
+        self.connection_established = False
 
-    def connect(self,port,baudrate):
+    def open(self,port,baudrate):
         self.ser.baudrate = baudrate
         self.ser.port = port
+        # Start thread - this will try to establish connection
+        self.start()
 
-        portlist = self.get_ports()
-        port_found = -1
-        port_amount = 0
-        terminate = False
-
-        #List all COM ports
-        for p, desc, hwid in sorted(portlist):
-            port_amount+=1
-            if p == self.ser.port:
-                port_found = 1
-
-        #In case no port is found
-        if port_amount == 0:
-            logging.error('no COM port found.')
-            self.connection_attempt_callback("NO-PORT-FOUND")
-
-        #In case ports are found but not chosen one
-        if port_amount > 0 and port_found == -1:
-            logging.error("%s port not found but others are available.",port)
-            self.connection_attempt_callback("OTHER-PORTS-FOUND")
-
-        # If everything ok, start the connection in the thread
-        self.attempt_connect = True
-
+    def connected(self):
+        return self.connection_established
 
     def get_ports(self):
         return serial.tools.list_ports.comports()
@@ -61,13 +35,11 @@ class SerialPort(Thread):
         if self.ser.isOpen() and self.running:
                 write_rtrn = self.ser.write(frame)
 
-    def disconnect(self):
-        self.ser.close()
-        self.connection_attempt_callback("DISCONNECTED")
-        logging.info("SerialPort disconnected.")
-
-    def stop(self):
+    def close(self):
         self.running = False
+        if self.isAlive():
+            self.join()
+        logging.info("SerialPort disconnected.")
 
     def serialRun(self):
         inwaiting = 0
@@ -93,26 +65,21 @@ class SerialPort(Thread):
 
     def run(self):
         logging.info('SerialPort thread started.')
+        try:
+            logging.info("Connecting to %s.",self.ser.port)
+            self.ser.open()
+        except:
+            logging.error("port %s found but impossible to open. Try to physically disconnect.",self.ser.port)
+
+        if self.ser.isOpen():
+            logging.info("Connected to port %s successfully.",self.ser.port)
+            self.running = True
+
         #Main serial loop
         while self.running:
             if self.ser.isOpen():
                 self.serialRun()
 
-            elif self.attempt_connect:
-                self.attempt_connect = False
-                try:
-                    logging.info("Connecting to %s.",self.ser.port)
-                    self.ser.open()
-                    self.connection_attempt_callback("CONNECTED")
-                except:
-                    logging.error("port %s found but impossible to open. Try to physically disconnect.",self.ser.port)
-                    self.ser.close()
-                    self.connection_attempt_callback("CONNECTION-ISSUE")
-
-                if self.ser.isOpen():
-                    logging.info("Connected to port %s successfully.",self.ser.port)
-                    self.connection_attempt_callback(self.ser.port)
-                else:
-                    self.connection_attempt_callback("UNKNOWN-CONNECTION-ISSUE")
-
+        self.ser.close()
+        self.connection_established = False
         logging.info('SerialPort thread stopped.')

@@ -4,7 +4,7 @@
 
 import tkinter as Tk
 import tkinter.ttk as ttk
-
+import logging
 import distantio
 from distantio.TimingUtils import timeit
 from UI.COM_Frame import COM_Frame
@@ -23,8 +23,10 @@ class Application(ttk.Frame):
 
         self.grid(row=0,column=0,sticky="WENS")
 
-        # Create Model
+        # DistantIO api
         self.model = distantio.DistantIO()
+        # Serial port will be our IO in this application
+        self.serial = distantio.SerialPort(self.model.decode_rx_data)
 
         # Init COM port frame
         self.com_ports = COM_Frame(self,self.model,relief=Tk.GROOVE)
@@ -42,16 +44,40 @@ class Application(ttk.Frame):
         self.com_ports.refresh_COM_ports()
         self.update()
 
+    def disconnect(self):
+        self.serial.disconnect()
+
+    def connect(self,port,baudrate):
+        self.serial.connect(port,baudrate)
+
     def stop(self):
-        self.model.finish()
+        self.serial.close()
+        logging.info('SerialPort stopped.')
+        self.model.terminate()
+        logging.info('Model terminated.')
 
     def update(self):
         # Decode 100 instructions max
         self.model.update(10)
         self.root.after(10,self.update)
 
+    def available_ports(self):
+        return self.serial.get_ports()
 
+    def request_write(self,variable_id,data):
+        frame = self.model.request_write(variable_id, data)
+        self.serial.write(frame)
 
+    def request_read_all(self):
+        frame_generator = self.model.request_read_all()
+
+        for frame in frame_generator:
+            self.serial.write(frame)
+
+    def request_descriptors(self):
+        frame = self.model.request_descriptors()
+        self.serial.write(frame)
+        
 """
 Program startup
 """

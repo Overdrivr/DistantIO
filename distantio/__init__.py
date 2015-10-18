@@ -2,3 +2,4 @@
 # For conditions of distribution and use, see copyright notice in the LICENSE file
 
 from distantio.DistantIO import DistantIO
+from distantio.SerialPort import SerialPort
