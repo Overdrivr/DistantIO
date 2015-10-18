@@ -60,12 +60,12 @@ class COM_Frame(ttk.LabelFrame):
         self.listbox_frame.grid_rowconfigure(0,weight=1)
 
         # Connect Signals from model to callbacks
-        self.model.signal_connected.connect(self.com_connected)
-        self.model.signal_disconnected.connect(self.com_disconnected)
-        self.model.signal_connecting.connect(self.com_connecting)
+        #self.model.signal_connected.connect(self.com_connected)
+        #self.model.signal_disconnected.connect(self.com_disconnected)
+        #self.model.signal_connecting.connect(self.com_connecting)
 
     def refresh_COM_ports(self):
-        ports_list = self.model.get_ports()
+        ports_list = self.parent.available_ports()
         self.liste.delete(0,Tk.END)
 
         print('COM ports list :')
@@ -79,10 +79,10 @@ class COM_Frame(ttk.LabelFrame):
             return
 
         chosen_port = self.liste.get(Tk.ACTIVE)
-        self.model.connect(chosen_port)
+        self.parent.serial.open(chosen_port,115200)
 
     def stop_com(self):
-        self.model.disconnect()
+        self.parent.serial.close()
 
     def com_connected(self,port,**kwargs):
         self.txt_connected.config(text="CONNECTED",fg='green')

@@ -117,7 +117,7 @@ class VariableTable_Frame(ttk.LabelFrame):
 
 
     def request_descriptors(self):
-        self.model.request_descriptors()
+        self.parent.request_descriptors()
 
     def remove_descriptors(self):
         # Empty table
@@ -183,7 +183,7 @@ class VariableTable_Frame(ttk.LabelFrame):
 
     def on_checkbutton_changed(self):
         if self.checkbutton_state.get():
-            self.model.request_read_all()
+            self.parent.request_read_all()
 
     def write_value(self):
         if not self.selected_var_id in self.variables:
@@ -195,7 +195,7 @@ class VariableTable_Frame(ttk.LabelFrame):
         except ValueError as e:
             print(str(e))
 
-        self.model.request_write(self.selected_var_id,value)
+        self.parent.request_write(self.selected_var_id,value)
 
     def variable_selected(self,event):
         # Get selection tree index
