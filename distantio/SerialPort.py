@@ -1,7 +1,7 @@
 # Copyright (C) 2014 Rémi Bèges
 # For conditions of distribution and use, see copyright notice in the LICENSE file
 
-from threading import Thread
+import threading
 import serial
 from queue import Queue
 from serial.tools.list_ports import comports
@@ -9,12 +9,13 @@ import logging
 from .TimingUtils import timeit
 
 #Serial data processing class
-class SerialPort(Thread):
+class SerialPort():
     def __init__(self,on_rx_data_callback):
-        Thread.__init__(self)
         self.ser = serial.Serial()
 
         self.rx_data_callback = on_rx_data_callback
+
+        self.serialthread = None
 
         self.threshold = 100
         self.connection_established = False
@@ -22,8 +23,10 @@ class SerialPort(Thread):
     def open(self,port,baudrate):
         self.ser.baudrate = baudrate
         self.ser.port = port
+        # TODO : Check thread is not already existing
         # Start thread - this will try to establish connection
-        self.start()
+        self.serialthread = threading.Thread(target=self.run)
+        self.serialthread.start()
 
     def connected(self):
         return self.connection_established
@@ -32,16 +35,17 @@ class SerialPort(Thread):
         return serial.tools.list_ports.comports()
 
     def write(self, frame):
-        if self.ser.isOpen() and self.running:
+        if self.ser.isOpen() and self.running and self.serialthread is not None:
                 write_rtrn = self.ser.write(frame)
 
     def close(self):
         self.running = False
-        if self.isAlive():
-            self.join()
+        if self.serialthread:
+            if self.serialthread.isAlive():
+                self.serialthread.join()
         logging.info("SerialPort disconnected.")
 
-    def serialRun(self):
+    def _serialRun(self):
         inwaiting = 0
         try:
             inwaiting = self.ser.inWaiting()
@@ -78,7 +82,7 @@ class SerialPort(Thread):
         #Main serial loop
         while self.running:
             if self.ser.isOpen():
-                self.serialRun()
+                self._serialRun()
 
         self.ser.close()
         self.connection_established = False
