@@ -22,7 +22,7 @@ class SerialPort():
 
     def open(self,port,baudrate):
         self.ser.baudrate = baudrate
-        self.ser.port = port
+        self.ser.port = port # CAN THROW EXCEPTIONS ?
         # TODO : Check thread is not already existing
         # Start thread - this will try to establish connection
         self.serialthread = threading.Thread(target=self.run)
