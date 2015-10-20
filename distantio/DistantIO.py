@@ -191,6 +191,8 @@ class DistantIO():
                 self.variable_list[instruction['var-id']]['name'] = ['var-name']
                 self.variable_list[instruction['var-id']]['writeable'] = ['var-writeable']
 
+                logging.info('Received MCU variable descriptor with id '+str(instruction['var-id']))
+
                 if not instruction['var-id'] in self.variables_values:
                     self.variables_values[instruction['var-id']] = ValuesXY(self.buffer_length)
 
