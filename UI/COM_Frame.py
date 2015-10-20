@@ -82,7 +82,7 @@ class COM_Frame(ttk.LabelFrame):
         self.parent.serial.open(chosen_port,115200)
 
     def stop_com(self):
-        self.parent.serial.close()
+        self.parent.disconnect()
 
     def com_connected(self,port,**kwargs):
         self.txt_connected.config(text="CONNECTED",fg='green')

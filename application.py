@@ -45,7 +45,8 @@ class Application(ttk.Frame):
         self.update()
 
     def disconnect(self):
-        self.serial.disconnect()
+        self.serial.close()
+        self.model.export_data()
 
     def connect(self,port,baudrate):
         self.serial.connect(port,baudrate)
@@ -77,7 +78,7 @@ class Application(ttk.Frame):
     def request_descriptors(self):
         frame = self.model.request_descriptors()
         self.serial.write(frame)
-        
+
 """
 Program startup
 """
