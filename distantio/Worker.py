@@ -1,14 +1,14 @@
 import multiprocessing
 from .FrameProtocol import Protocol
-from .DistantioProtocol import distantio_protocol
+from .DistantIOProtocol import distantio_protocol
 import logging
 import binascii
 
 class Worker(multiprocessing.Process):
-    def __init__(self,input_queue,output_queue,new_data_condition,stop_condition):
+    def __init__(self,input_queue,output_connection,new_data_condition,stop_condition):
         multiprocessing.Process.__init__(self)
         self.input_queue = input_queue
-        self.output_queue = output_queue
+        self.output_connection = output_connection
         self.wait_condition = new_data_condition
         self.stop_condition = stop_condition
         self.protocol = Protocol(self.on_frame_decoded_callback)
@@ -35,4 +35,4 @@ class Worker(multiprocessing.Process):
             logging.warning("received error "+str(e)+" with frame : %s",binascii.hexlify(frame))
             return
         else:
-            self.output_queue.put(instruction)
+            self.output_connection.send(instruction)
