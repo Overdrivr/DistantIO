@@ -2,10 +2,10 @@
 DistantIO is a convenient framework for reading and writing variables on a microcontroller in real time. This is a master-slave protocol.
 Master can be for instance a computer and the slave an embedded device such as a MicroController Unit (MCU).
 
-The whole program was designed to be simple to use.
+The whole program was designed to be simple to setup and use.
 
-On the slave side, only three steps are required.
-Simply register variables during initialization time, feed the incoming communication data to the API, update it regularly and you're good to go.
+On the slave side, only two steps are required.
+Simply register variables during initialization time and update the API from time to time and you're good to go.
 
 Master side, the user interface provided can be used as is, for reading/writing/plotting MCU variables.
 Or you can ditch it entirely and develop your own user interface with the API. ;)
@@ -27,7 +27,9 @@ The UI is light but gives a good example on how to use the API.
 The master-side API is entirely located in the API/ folder. The Model class exposes all the methods you will need to call in your application.
 To avoid coupling from API to UI, the Model class also defines a set of signals, which you can connect to slots in your UI. It is using the lightweight python module signalslot (<https://pypi.python.org/pypi/signalslot/0.1.0>).
 
-To use the API in your project, simply copy API/ folder into your project folder. This project is not hosted on PyPi and cannot be installed using pip.
+To use distantio in your project, simply copy distantio folder into your project folder, and add your project folder to the PYTHONPATH.
+
+This project is *not* hosted on PyPi yet and cannot be installed using pip. This might change in a near future now that both master and slave APIs are going closer to be stable.
 
 ### Slave-side
 #### C implementation
@@ -44,6 +46,8 @@ Supported Boards:
 #### ARM mbed
 The C implementation is available on ARM mbed development platform(<https://developer.mbed.org/users/Overdrivr/code/DistantIO/>).
 This increases considerably the amount of supported hardware platform. See the full list on <https://developer.mbed.org/platforms/>
+
+A C++ interface is in development.
 
 ## Python installation requirements
 ### Core version
@@ -65,29 +69,17 @@ TODO : Use virtualenv requirements system for installing modules. But install nu
 
 
 ## Running the User Interface
-The UI can be launched by running in a console pointing to DistantIO/
+The UI can be launched by running the following command in a console pointing to DistantIO folder
 
 ```bash
 python application.py
 ```
 
-You will most likely have import errors from the API. If this is the case, add the DistantIO **parent** folder to the PYTHONPATH.
+You will most likely have import errors from the API. If this is the case, add the DistantIO folder to the PYTHONPATH.
 
-If your folder is for instance in
-
-```
-C:/Documents/GitHub/DistantIO
-```
-
-You need to add
-
-```
-C:/Documents/Github
-```
-to PYTHONPATH
 *Note : If you have spaces in your pathname, don't forget to use "".*
 
-For instance with C:/Program Files/GitHub/DistantIO add C:/"Program Files"/Github to PYTHONPATH
+For instance C:/Program Files/GitHub/DistantIO -> C:/"Program Files"/Github/DistantIO
 
 ## Running tests
 For now, both protocols in the API can be automatically tested using pytest.
