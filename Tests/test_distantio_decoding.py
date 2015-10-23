@@ -3,11 +3,11 @@
 
 # See __init__.py file on how to run tests automatically
 
-from DistantIO.API.DistantioProtocol import distantio_protocol
-from DistantIO.API.crc import crc16
+from distantio.DistantioProtocol import distantio_protocol
+from distantio.crc import crc16
 from struct import pack,unpack
 import pytest
-# test decoding unkown command
+#  TODO : test decoding unkown command
 
 # test decoding valid returned-descriptor frame
 def test_returned_descriptor_variable_non_writeable():

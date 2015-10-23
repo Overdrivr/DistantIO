@@ -3,7 +3,7 @@
 
 # See __init__.py file on how to run tests automatically
 
-from DistantIO.API.Datalogger import Datalogger
+from distantio.Datalogger import Datalogger
 import pytest
 import random
 import numpy as np

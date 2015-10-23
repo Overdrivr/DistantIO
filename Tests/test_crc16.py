@@ -3,7 +3,7 @@
 
 # See __init__.py file on how to run tests automatically
 
-from DistantIO.API.crc import *
+from distantio.crc import crc16
 
 def test_crc_single_bit_changed():
     data_a = [0x3f,0x1a,0xff,0x56,0x3a]
