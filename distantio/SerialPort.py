@@ -74,9 +74,12 @@ class SerialPort():
             self.ser.open()
         except:
             logging.error("port %s found but impossible to open. Try to physically disconnect.",self.ser.port)
+            self.connection_established = False
+            self.running = False
 
         if self.ser.isOpen():
             logging.info("Connected to port %s successfully.",self.ser.port)
+            self.connection_established = True
             self.running = True
 
         #Main serial loop
