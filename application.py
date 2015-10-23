@@ -32,7 +32,6 @@ class Application(ttk.Frame):
         self.com_ports = COM_Frame(self,self.model,relief=Tk.GROOVE)
         self.com_ports.grid(column=0,row=0,sticky='NSEW',pady=2,padx=5)
 
-
         # Init table frame
         self.var_table = VariableTable_Frame(self,self.model,relief=Tk.GROOVE)
         self.var_table.grid(column=0,row=1,sticky='NSEW',pady=2,padx=5)
@@ -43,12 +42,14 @@ class Application(ttk.Frame):
 
         self.com_ports.refresh_COM_ports()
         self.update()
+        self.refresh_ports()
 
     def disconnect(self):
         self.serial.close()
         self.model.export_data()
 
     def connect(self,port,baudrate):
+
         self.serial.connect(port,baudrate)
 
     def stop(self):
@@ -58,9 +59,18 @@ class Application(ttk.Frame):
         logging.info('Model terminated.')
 
     def update(self):
-        # Decode 100 instructions max
-        self.model.update(10)
+        # Decode instructions
+        for i in range(20):
+            self.model.update()
+
         self.root.after(10,self.update)
+
+    def refresh_ports(self):
+        if self.serial.connected():
+            self.com_ports.com_connected()
+        else:
+            self.com_ports.com_disconnected()
+        self.root.after(500,self.refresh_ports)
 
     def available_ports(self):
         return self.serial.get_ports()

@@ -3,7 +3,7 @@
 
 import tkinter as Tk
 import tkinter.ttk as ttk
-from DistantIO.UI.Plot2D_Frame import Plot2D_Frame
+from UI.Plot2D_Frame import Plot2D_Frame
 import logging
 from distantio.Utils import ValuesXY
 

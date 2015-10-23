@@ -84,7 +84,7 @@ class COM_Frame(ttk.LabelFrame):
     def stop_com(self):
         self.parent.disconnect()
 
-    def com_connected(self,port,**kwargs):
+    def com_connected(self,**kwargs):
         self.txt_connected.config(text="CONNECTED",fg='green')
         self.parent.update_idletasks()
 
