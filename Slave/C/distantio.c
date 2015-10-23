@@ -1,25 +1,30 @@
-// Copyright (C) 2015 Rémi Bèges
-// For conditions of distribution and use, see copyright notice in the LICENSE.md file
+/*
+ * distantio.c
+ *
+ *  Created on: Oct 13, 2014
+ *      Author: B48923
+ */
 
 #include "distantio.h"
 #include "crc.h"
 #include "string.h"
 #include "protocol.h"
 
-
+/*
+ * WARNING : IMPLEMENTATION FOR LITTLE-ENDIAN PROCESSOR
+ * TODO : HANDLE BOTH
+ */
 
 static log Log;
 uint32_t tmp;
 
-void send_variable(uint16_t index);
-uint16_t get_size(dio_type type);
-void send_descriptor(uint16_t index);
-void send_group_descriptor(uint16_t index);
+void _dIO_send_variable(uint16_t index,float extra_identifier_1,uint16_t extra_identifier_2=0);
+uint16_t _dIO_get_size(dio_type type);
+void _dIO_send_descriptor(uint16_t index);
+void _dIO_send_group_descriptor(uint16_t index);
 
-/**
- * Inits the distant io framework
- */
-void init_distantio()
+
+void dIO_init()
 {
 	uint16_t i;
 	char default_name[] = {"undef.  "};
@@ -30,149 +35,49 @@ void init_distantio()
 		Log.variables[i].ptr = 0;
 		Log.variables[i].writeable = 0;
 		Log.variables[i].id = i;
-		strcpy(Log.variables[i].name,default_name);
+		strncpy(Log.variables[i].name,default_name,NAMESIZE);
 		Log.variables[i].send = 0;
 		Log.variables[i].groupID = 0;
 	}
 	tmp=0;
 	Log.current_group_id = 0;
-	strcpy(Log.groups[0].name,"default");
+	strncpy(Log.groups[0].name,"default",NAMESIZE);
 }
 
-/**
- * Register a variable exchanged with the computer
- */
-uint8_t register_var(void* ptr, uint16_t size, dio_type type, uint8_t writeable, char* name)
+uint8_t dIO_var(void* ptr, uint16_t size, dio_type type, uint8_t writeable, char* name, float refresh_rate)
 {
 	// Too many variables, aborting
 	if(Log.amount >= VARIABLES_AMOUNT)
 		return 1;
 
 	Log.variables[Log.amount].ptr = (uint8_t*) ptr;
-	Log.variables[Log.amount].size = get_size(type);
+	Log.variables[Log.amount].size = _dIO_get_size(type);
 	Log.variables[Log.amount].writeable = writeable;
 	Log.variables[Log.amount].type = type;
 	Log.variables[Log.amount].groupID = Log.current_group_id;
-	strcpy(Log.variables[Log.amount].name,name);
-
+	strncpy(Log.variables[Log.amount].name,name,NAMESIZE);
+	Log.variables[Log.amount].refresh_rate = refresh_rate;
+	Log.variables[Log.amount].last_refreshed = 0;
 	Log.amount++;
 
 	return 0;
 }
 
-void start_group(char* groupname)
+void dIO_group(char* groupname)
 {
 	Log.current_group_id++;
-	strcpy(Log.groups[Log.current_group_id].name,groupname);
+	strncpy(Log.groups[Log.current_group_id].name,groupname,NAMESIZE);
 }
 
-/**
- * Send var descriptor
- */
-
-void send_descriptor(uint16_t index)
-{
-	if(index >= Log.amount)
-		return;
-
-	static uint8_t buffer[PAYLOAD_SIZE];
-	uint8_t type;
-
-	// Respond returned-descriptor
-	buffer[0] = 0x00;
-
-	// Write id
-	uint16_t ID = ((Log.variables[index].groupID & 0x003F) << 10) + (index & 0x3FF);
-	uint8_t * temp_ptr = (uint8_t*)(&ID);
-	buffer[1] = *(temp_ptr + 1);
-	buffer[2] = *(temp_ptr    );
-
-	// Write type & writeable
-
-	type = (uint8_t)(Log.variables[index].type);
-
-	if(Log.variables[index].writeable)
-		type += 0xF0;
-
-	buffer[3] = type;
-
-	//Write name
-	uint16_t i = 4;
-	for(uint16_t k = 0 ; k < 8 ; k++)
-	{
-		if(k < strlen(Log.variables[index].name))
-		{
-			buffer[i] = Log.variables[index].name[k];
-			i++;
-		}
-		else
-			buffer[i++] = 0;
-	}
-
-	// Compute crc
-	uint16_t crc_value = crc16(buffer,i);
-
-	// Write crc into buffer's last byte
-	buffer[i++] = (crc_value >> 8) & 0xFF;
-	buffer[i++] = crc_value & 0xFF;
-
-	// Encode frame
-	encode(buffer,i);
-}
-
-void send_group_descriptor(uint16_t index)
-{
-	if(index > Log.current_group_id)
-		return;
-
-	static uint8_t buffer[PAYLOAD_SIZE];
-
-	// Respond returned-descriptor
-	buffer[0] = 0x00;
-
-	// Write id
-	uint16_t ID = (index & 0x3F) << 10;
-	uint8_t * temp_ptr = (uint8_t*)(&ID);
-	buffer[1] = *(temp_ptr + 1);
-	buffer[2] = *(temp_ptr);
-
-	// Write type
-	buffer[3] = 0x07;
-
-	//Write name
-	uint16_t i = 4;
-	for(uint16_t k = 0 ; k < 8 ; k++)
-	{
-		if(k < strlen(Log.groups[index].name))
-		{
-			buffer[i] = Log.groups[index].name[k];
-			i++;
-		}
-		else
-			buffer[i++] = 0;
-	}
-
-	// Compute crc
-	uint16_t crc_value = crc16(buffer,i);
-
-	// Write crc into buffer's last byte
-	buffer[i++] = (crc_value >> 8) & 0xFF;
-	buffer[i++] = crc_value & 0xFF;
-
-	// Encode frame
-	encode(buffer,i);
-}
-
-void distantio_decode(uint8_t* data,uint16_t datasize)
+void dIO_decode(uint8_t* data,uint16_t datasize)
 {
 	// First check data size
-	// 1 byte cmd + 2 bytes id + 1 byte type + FRAME_SIZE + 2 byte CRC
-	if(datasize != PAYLOAD_SIZE)
+	if(datasize != FRAMESIZE)
 		return;
 
 	// Second, check CRC
-	uint16_t crc_value = crc16(data,PAYLOAD_SIZE-2);
-	uint16_t crc_rx = ((uint16_t)data[PAYLOAD_SIZE-2] << 8) | data[PAYLOAD_SIZE-1];
+	uint16_t crc_value = crc16(data,FRAMESIZE-2);
+	uint16_t crc_rx = ((uint16_t)data[FRAMESIZE-2] << 8) | data[FRAMESIZE-1];
 
 	if(crc_value != crc_rx)
 		return;
@@ -194,10 +99,10 @@ void distantio_decode(uint8_t* data,uint16_t datasize)
 		case 0x02:
 			// Send variables
 			for(uint16_t i = 0 ; i < Log.amount ; i++)
-				send_descriptor(i);
+				_dIO_send_descriptor(i);
 			// Send groups
 			for(uint16_t i = 0 ; i <= Log.current_group_id ; i++)
-				send_group_descriptor(i);
+				_dIO_send_group_descriptor(i);
 			break;
 
 		// User provided value to write
@@ -211,7 +116,7 @@ void distantio_decode(uint8_t* data,uint16_t datasize)
 			if(Log.variables[ID].type != type)
 				return;
 
-			uint16_t start_address = 4 + DATA_SIZE - 1;
+			uint16_t start_address = DATASTART + DATASIZE - 1;
 
 			// Copy contents directly into variable
 			for(uint16_t i = 0 ; i < Log.variables[ID].size ; i++)
@@ -240,23 +145,199 @@ void distantio_decode(uint8_t* data,uint16_t datasize)
 	}
 }
 
-void send_variables()
+void dIO_update(float current_time)
 {
 	for(uint16_t i = 0 ; i < Log.amount ; i++)
 	{
 		if(Log.variables[i].send == 0)
 			continue;
 
-		send_variable(i);
+		if(current_time < Log.variables[i].last_refreshed + Log.variables[i].refresh_rate)
+			continue;
+
+		_dIO_send_variable(i,current_time);
+		Log.variables[i].last_refreshed = current_time;
 	}
 }
 
-void send_variable(uint16_t index)
+void dIO_send_alive()
+{
+	uint8_t buffer[FRAMESIZE];
+	buffer[0] = 0x03;
+
+	// Compute crc
+	uint16_t crc_value = crc16(buffer,FRAMESIZE - 2);
+
+	// Write crc into buffer's last byte
+	buffer[FRAMESIZE - 1] = crc_value & 0xFF;
+	buffer[FRAMESIZE - 2] = (crc_value >> 8) & 0xFF;
+
+	// Send frame to encoding
+	encode(buffer,FRAMESIZE);
+}
+
+ void dIO_emergency_send(void* ptr, uint16_t size, dio_type type, char* name, float recordingtime, uint16_t index)
+ {
+
+	uint8_t buffer[FRAMESIZE];
+
+	// Response code 0x09
+	buffer[0] = 0x09;
+
+	// Write variable ID
+	uint8_t * temp_ptr = (uint8_t*)(name);
+	buffer[1] = *(temp_ptr + 1);
+	buffer[2] = *(temp_ptr);
+
+	// Write variable type
+	buffer[3] = type;
+
+	// Extra identifier 1
+	temp_ptr = (uint8_t*)(&recordingtime);
+	buffer[4] = *(temp_ptr + 3);
+	buffer[5] = *(temp_ptr + 2);
+	buffer[6] = *(temp_ptr + 1);
+	buffer[7] = *(temp_ptr    );
+
+	// Extra identifier 2
+	temp_ptr = (uint8_t*)(&index);
+	buffer[8] = *(temp_ptr + 1);
+	buffer[9] = *(temp_ptr    );
+
+	uint16_t i = 10;
+
+	// Write data
+	for(uint16_t k = 0 ; k < DATASIZE ; k++)
+	{
+		uint16_t off = DATASIZE - 1 - k;
+
+		// Fill buffer with data
+		if(off < size)
+		{
+			temp_ptr = (uint8_t*)(ptr) + off ;
+			buffer[i++] = *temp_ptr;
+		}
+		// Fill remaining bits with 0
+		else
+		{
+			buffer[i++] = 0;
+		}
+	}
+
+	// Compute crc
+	uint16_t crc_value = crc16(buffer,i);
+
+	// Write crc into buffer's last byte
+	buffer[i++] = (crc_value >> 8) & 0xFF;
+	buffer[i++] = crc_value & 0xFF;
+
+	// Encode frame
+	encode(buffer,i);
+ }
+
+/* ------------------- PRIVATE FUNCTIONS ------------------ */
+
+void _dIO_send_descriptor(uint16_t index)
 {
 	if(index >= Log.amount)
 		return;
 
-	static uint8_t buffer[PAYLOAD_SIZE];
+	uint8_t buffer[FRAMESIZE];
+	uint8_t type;
+
+	// Respond returned-descriptor
+	buffer[0] = 0x00;
+
+	// Write id
+	uint16_t ID = ((Log.variables[index].groupID & 0x003F) << 10) + (index & 0x3FF);
+	uint8_t * temp_ptr = (uint8_t*)(&ID);
+	buffer[1] = *(temp_ptr + 1);
+	buffer[2] = *(temp_ptr    );
+
+	// Write type & writeable
+
+	type = (uint8_t)(Log.variables[index].type);
+
+	if(Log.variables[index].writeable)
+		type += 0xF0;
+
+	buffer[3] = type;
+
+	//Write name
+	uint16_t i = 4;
+	// TODO : Replace with strncpy
+	for(uint16_t k = 0 ; k < NAMESIZE ; k++)
+	{
+		if(k < strlen(Log.variables[index].name))
+		{
+			buffer[i] = Log.variables[index].name[k];
+			i++;
+		}
+		else
+			buffer[i++] = 0;
+	}
+
+	// Compute crc
+	uint16_t crc_value = crc16(buffer,i);
+
+	// Write crc into buffer's last byte
+	buffer[i++] = (crc_value >> 8) & 0xFF;
+	buffer[i++] = crc_value & 0xFF;
+
+	// Encode frame
+	encode(buffer,i);
+}
+
+void _dIO_send_group_descriptor(uint16_t index)
+{
+	if(index > Log.current_group_id)
+		return;
+
+	uint8_t buffer[FRAMESIZE];
+
+	// Respond returned-descriptor
+	buffer[0] = 0x00;
+
+	// Write id
+	uint16_t ID = (index & 0x3F) << 10;
+	uint8_t * temp_ptr = (uint8_t*)(&ID);
+	buffer[1] = *(temp_ptr + 1);
+	buffer[2] = *(temp_ptr);
+
+	// Write type
+	buffer[3] = 0x07;
+
+	//Write name
+	uint16_t i = 4;
+	for(uint16_t k = 0 ; k < NAMESIZE ; k++)
+	{
+		if(k < strlen(Log.groups[index].name))
+		{
+			buffer[i] = Log.groups[index].name[k];
+			i++;
+		}
+		else
+			buffer[i++] = 0;
+	}
+
+	// Compute crc
+	uint16_t crc_value = crc16(buffer,i);
+
+	// Write crc into buffer's last byte
+	buffer[i++] = (crc_value >> 8) & 0xFF;
+	buffer[i++] = crc_value & 0xFF;
+
+	// Encode frame
+	encode(buffer,i);
+}
+
+
+void _dIO_send_variable(uint16_t index,float extra_identifier_1,uint16_t extra_identifier_2)
+{
+	if(index >= Log.amount)
+		return;
+
+	uint8_t buffer[FRAMESIZE];
 
 	// Response code 0x01
 	buffer[0] = 0x01;
@@ -271,12 +352,24 @@ void send_variable(uint16_t index)
 	buffer[3] = Log.variables[index].type;
 	//TODO writeable
 
-	uint16_t i = 4;
+	// Extra identifier 1
+	temp_ptr = (uint8_t*)(&extra_identifier_1);
+	buffer[4] = *(temp_ptr + 3);
+	buffer[5] = *(temp_ptr + 2);
+	buffer[6] = *(temp_ptr + 1);
+	buffer[7] = *(temp_ptr    );
+
+	// Extra identifier 2
+	temp_ptr = (uint8_t*)(&extra_identifier_2);
+	buffer[8] = *(temp_ptr + 1);
+	buffer[9] = *(temp_ptr    );
+
+	uint16_t i = 10;
 
 	// Write data
-	for(uint16_t k = 0 ; k < DATA_SIZE ; k++)
+	for(uint16_t k = 0 ; k < DATASIZE ; k++)
 	{
-		uint16_t off = DATA_SIZE - 1 - k;
+		uint16_t off = DATASIZE - 1 - k;
 
 		// Fill buffer with data
 		if(off < Log.variables[index].size)
@@ -302,34 +395,8 @@ void send_variable(uint16_t index)
 	encode(buffer,i);
 }
 
-void send_alive()
-{
-	static uint8_t buffer[PAYLOAD_SIZE] = {0x03,0x00,0x10,0x00,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x00,0x00};
 
-	uint16_t index = 1;
-	uint16_t group = 0;
-	uint16_t ID = ((group & 0x003F) << 10) + (index & 0x3FF);
-	uint8_t * temp_ptr = (uint8_t*)(&ID);
-	buffer[1] = *(temp_ptr + 1);
-	buffer[2] = *(temp_ptr    );
-
-	// Compute crc
-	uint16_t crc_value = crc16(buffer,PAYLOAD_SIZE - 2);
-
-	// Write crc into buffer's last byte
-	buffer[PAYLOAD_SIZE - 1] = crc_value & 0xFF;
-	buffer[PAYLOAD_SIZE - 2] = (crc_value >> 8) & 0xFF;
-
-	// Send frame to encoding
-	encode(buffer,PAYLOAD_SIZE);
-}
-
-
-/**
- * Returns the size in byte for each variable
- */
-
-uint16_t get_size(dio_type type)
+uint16_t _dIO_get_size(dio_type type)
 {
 	switch(type)
 	{
