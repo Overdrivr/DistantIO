@@ -1,3 +1,4 @@
+DEPRECATED : See https://github.com/Overdrivr/pytelemetrycli for a much, much better alternative
 # DistantIO
 DistantIO is a convenient framework for reading and writing variables on a microcontroller in real time. This is a master-slave protocol.
 Master can be for instance a computer and the slave an embedded device such as a MicroController Unit (MCU).
